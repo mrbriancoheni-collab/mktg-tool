@@ -11,6 +11,8 @@
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit",
+    "wp:content": "node wordpress/tools/build-starter-content.mjs",
+    "wp:zip": "cd wordpress && rm -f adcanvas-theme.zip && zip -qr adcanvas-theme.zip adcanvas-theme -x '*.DS_Store' && echo 'Wrote wordpress/adcanvas-theme.zip'",
     "check:catalog": "tsx scripts/check-catalog.ts",
     "icons": "tsx scripts/gen-brand-icons.ts",
     "smoke": "tsx scripts/smoke.ts",

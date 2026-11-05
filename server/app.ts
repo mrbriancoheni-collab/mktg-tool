@@ -25,6 +25,8 @@ import { activationFunnel, recordEvents } from "./analytics";
 import { adminsOf, autoSnapshot, featuresRouter, mentionedMembers, notifyUsers } from "./features";
 
 const appUrl = (req: Request) => process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
+/** Public marketing site (e.g. the WordPress site at https://yourdomain.com), when the app runs on its own subdomain. */
+export const marketingUrl = () => (process.env.MARKETING_URL ?? "").replace(/\/+$/, "") || null;
 
 type Handler = (req: Request, res: Response) => unknown;
 const wrap = (fn: Handler) => (req: Request, res: Response, next: NextFunction) =>
@@ -109,7 +111,7 @@ export function createApp() {
 
   // ── Public ──
   app.get("/api/status", (_req, res) =>
-    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), googleLogin: googleLoginEnabled(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta"), linkedin: providerConfigured("linkedin"), tiktok: providerConfigured("tiktok") } }),
+    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), googleLogin: googleLoginEnabled(), marketingUrl: marketingUrl(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta"), linkedin: providerConfigured("linkedin"), tiktok: providerConfigured("tiktok") } }),
   );
   app.use("/api", authRouter);
 
@@ -456,6 +458,13 @@ export function createApp() {
   }));
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "Not found")));
+
+  // Legal pages live on the marketing site when there is one.
+  app.get(/^\/legal\/([a-z-]+)\/?$/, (req, res, next) => {
+    const site = marketingUrl();
+    if (!site) return next();
+    res.redirect(302, `${site}/legal/${req.params[0]}/`);
+  });
 
   // Production: serve the built client
   const dist = path.resolve("dist");

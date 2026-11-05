@@ -21,6 +21,8 @@ export function Root() {
   const path = location.pathname;
   const params = new URLSearchParams(location.search);
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  // The marketing site (WordPress) when the app runs on its own subdomain; undefined until loaded.
+  const [site, setSite] = useState<string | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     try {
@@ -34,15 +36,28 @@ export function Root() {
   }, []);
 
   useEffect(() => {
+    api.status().then((st) => setSite(st.marketingUrl ?? null)).catch(() => setSite(null));
+    // "Start with Pro" on the marketing site links to /signup?plan=pro — remember it through sign-up (incl. Google).
+    const plan = params.get("plan");
+    if (plan === "pro" || plan === "team") try { sessionStorage.setItem("pendingPlan", plan); } catch { /* storage unavailable */ }
     refresh();
     const on401 = () => setMe(null);
     onUnauthorized.addEventListener("401", on401);
     return () => onUnauthorized.removeEventListener("401", on401);
   }, [refresh]);
 
-  const legal = path.match(/^\/legal\/([a-z-]+)\/?$/);
-  if (legal) return <LegalPage slug={legal[1]} />;
+  usePendingCheckout(me);
+
   const boot = <div className="boot"><span className="spinner" /></div>;
+  const legal = path.match(/^\/legal\/([a-z-]+)\/?$/);
+  if (legal) {
+    if (site === undefined) return boot;
+    if (site) {
+      location.replace(`${site}/legal/${legal[1]}/`);
+      return boot;
+    }
+    return <LegalPage slug={legal[1]} />;
+  }
   if (path === "/report" && (params.get("share") || me)) return <Suspense fallback={boot}><Report /></Suspense>;
   if (path === "/admin" && me) return <Suspense fallback={boot}><Admin /></Suspense>;
 
@@ -56,9 +71,28 @@ export function Root() {
 
   if (invite && me) return <AcceptInvite token={invite[1]} onDone={refresh} />;
   if (authMode && !me) return <AuthPage mode={authMode} token={invite?.[1] ?? params.get("token") ?? undefined} onDone={refresh} />;
-  if (!me) return path === "/" ? <Landing /> : <AuthPage mode="login" onDone={refresh} />;
+  // With a separate marketing site, the app's root is just the sign-in page.
+  if (!me) {
+    if (path !== "/") return <AuthPage mode="login" onDone={refresh} />;
+    if (site === undefined) return boot;
+    return site ? <AuthPage mode="login" onDone={refresh} /> : <Landing />;
+  }
   if (authMode) history.replaceState(null, "", "/");
   return <App onAccountChange={refresh} />;
+}
+
+/** After sign-up from a paid plan's button, send the new workspace owner straight to checkout once. */
+function usePendingCheckout(me: Me | null | undefined) {
+  useEffect(() => {
+    if (!me) return;
+    let plan: string | null = null;
+    try {
+      plan = sessionStorage.getItem("pendingPlan");
+      sessionStorage.removeItem("pendingPlan");
+    } catch { /* storage unavailable */ }
+    if ((plan !== "pro" && plan !== "team") || !me.billingEnabled || me.role !== "owner" || me.workspace.plan !== "free") return;
+    api.checkout(plan).then((r) => location.assign(r.url)).catch(() => {});
+  }, [me]);
 }
 
 function AcceptInvite({ token, onDone }: { token: string; onDone: () => void }) {

@@ -97,7 +97,7 @@ async function stream(url: string, body: unknown, onText: (full: string) => void
 }
 
 export const api = {
-  status: () => json<{ ai: "live" | "demo"; billingEnabled: boolean; googleLogin: boolean; oauth: Record<string, boolean> }>("/api/status"),
+  status: () => json<{ ai: "live" | "demo"; billingEnabled: boolean; googleLogin: boolean; marketingUrl: string | null; oauth: Record<string, boolean> }>("/api/status"),
 
   // Auth & account
   me: () => json<Me>("/api/auth/me"),

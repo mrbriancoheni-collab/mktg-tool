@@ -1,0 +1,138 @@
+/*
+ * AdCanvas theme — styles that theme.json can't express.
+ * Loaded on the front end and in the editor.
+ */
+
+/* ── Base ─────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+img { height: auto; }
+:where(.wp-site-blocks) > * { margin-block-start: 0; }
+.screen-reader-text:focus { clip: auto !important; clip-path: none; height: auto; width: auto; z-index: 100000; background: #fff; padding: .75rem 1rem; }
+
+/* ── Header ───────────────────────────────────────────── */
+.adcanvas-header { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .86); backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--wp--preset--color--line); }
+.admin-bar .adcanvas-header { top: 32px; }
+@media (max-width: 782px) { .admin-bar .adcanvas-header { top: 46px; } }
+@media (max-width: 600px) { .admin-bar .adcanvas-header { top: 0; } }
+.adcanvas-logo { display: inline-flex; align-items: center; gap: .55rem; }
+.adcanvas-logo .wp-block-site-title a { color: inherit; }
+.adcanvas-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--wp--preset--gradient--brand); flex: none; display: inline-block; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); position: relative; }
+.adcanvas-mark::after { content: ""; position: absolute; inset: 8px 7px; border: 2px solid #fff; border-radius: 3px; border-left-width: 6px; }
+.adcanvas-header .wp-block-navigation a:hover { color: var(--wp--preset--color--brand); text-decoration: none; }
+.adcanvas-header .is-style-outline .wp-block-button__link { border: 1px solid var(--wp--preset--color--line); background: transparent; color: var(--wp--preset--color--contrast); }
+.adcanvas-header .is-style-outline .wp-block-button__link:hover { background: var(--wp--preset--color--surface); }
+.adcanvas-header .wp-block-button__link { padding: .55rem 1rem; font-size: .925rem; }
+@media (max-width: 600px) { .adcanvas-header .adcanvas-login { display: none; } }
+
+/* ── Buttons ──────────────────────────────────────────── */
+.wp-block-button__link { transition: background-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+.wp-block-button:not(.is-style-outline) .wp-block-button__link:hover { box-shadow: 0 6px 18px rgba(109, 94, 252, .3); transform: translateY(-1px); text-decoration: none; }
+.wp-block-button.is-style-outline .wp-block-button__link { border: 1px solid var(--wp--preset--color--line); color: var(--wp--preset--color--contrast); background: var(--wp--preset--color--base); }
+.wp-block-button.is-style-outline .wp-block-button__link:hover { border-color: var(--wp--preset--color--brand); color: var(--wp--preset--color--brand); text-decoration: none; }
+.has-brand-background-color .wp-block-button:not(.is-style-outline) .wp-block-button__link,
+.has-brand-gradient-background .wp-block-button:not(.is-style-outline) .wp-block-button__link { background: #fff; color: var(--wp--preset--color--brand-dark); }
+.has-brand-gradient-background .wp-block-button.is-style-outline .wp-block-button__link { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .55); }
+.has-brand-gradient-background .wp-block-button.is-style-outline .wp-block-button__link:hover { border-color: #fff; }
+
+/* ── Block styles ─────────────────────────────────────── */
+.is-style-eyebrow { font-size: .8rem !important; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--wp--preset--color--brand); }
+.is-style-gradient { background: var(--wp--preset--gradient--headline); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--wp--preset--color--brand); }
+.wp-block-group.is-style-card { background: var(--wp--preset--color--base); border: 1px solid var(--wp--preset--color--line); border-radius: 16px; box-shadow: var(--wp--preset--shadow--card); padding: var(--wp--preset--spacing--40); }
+.wp-block-group.is-style-featured-card { background: var(--wp--preset--color--base); border: 2px solid var(--wp--preset--color--brand); border-radius: 16px; box-shadow: var(--wp--preset--shadow--lift); padding: var(--wp--preset--spacing--40); position: relative; }
+.is-style-checks { list-style: none; padding-left: 0 !important; }
+.is-style-checks li { position: relative; padding-left: 1.75rem; margin-block: .45rem; }
+.is-style-checks li::before { content: ""; position: absolute; left: 0; top: .3em; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--wp--preset--color--brand-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%236d5efc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
+
+/* ── Hero ─────────────────────────────────────────────── */
+.adcanvas-hero { background: radial-gradient(1200px 500px at 50% -10%, #ebe7ff 0%, rgba(255, 255, 255, 0) 70%), var(--wp--preset--color--base); overflow: hidden; }
+.adcanvas-hero h1 { max-width: 16ch; margin-inline: auto; }
+.adcanvas-hero .adcanvas-lede { max-width: 40rem; margin-inline: auto; }
+.adcanvas-shot img { max-height: 620px; width: auto; }
+.adcanvas-hero .adcanvas-shot img { max-height: none; width: 100%; }
+.adcanvas-shot img, .adcanvas-shot.wp-block-image img { border-radius: 14px; border: 1px solid var(--wp--preset--color--line); box-shadow: var(--wp--preset--shadow--lift); }
+.adcanvas-hero .adcanvas-shot { margin-bottom: calc(-1 * var(--wp--preset--spacing--50)); }
+.adcanvas-pill { display: inline-block; padding: .3rem .8rem; border-radius: 999px; background: var(--wp--preset--color--brand-soft); color: var(--wp--preset--color--brand-dark); font-size: .85rem; font-weight: 600; }
+.adcanvas-pill a { color: inherit; }
+
+/* ── Logos strip ──────────────────────────────────────── */
+.adcanvas-logos p { margin: 0; }
+.adcanvas-logos .adcanvas-logo-item { font-weight: 700; color: var(--wp--preset--color--muted); opacity: .8; letter-spacing: -.01em; white-space: nowrap; }
+
+/* ── Feature cards ────────────────────────────────────── */
+.adcanvas-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--wp--preset--color--brand-soft); color: var(--wp--preset--color--brand); font-size: 1.3rem; line-height: 1; margin: 0 0 .5rem; }
+.adcanvas-features .wp-block-group.is-style-card { height: 100%; transition: transform .15s ease, box-shadow .15s ease; }
+.adcanvas-features .wp-block-group.is-style-card:hover { transform: translateY(-2px); box-shadow: var(--wp--preset--shadow--lift); }
+.adcanvas-features h3 { font-size: var(--wp--preset--font-size--large); }
+.adcanvas-step-num { width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; background: var(--wp--preset--gradient--brand); color: #fff; font-weight: 700; font-size: .95rem; margin: 0; }
+
+/* ── Pricing ──────────────────────────────────────────── */
+.adcanvas-pricing .wp-block-column > .wp-block-group { height: 100%; display: flex; flex-direction: column; }
+.adcanvas-pricing .wp-block-buttons { margin-top: auto; padding-top: var(--wp--preset--spacing--30); }
+.adcanvas-pricing .wp-block-button, .adcanvas-pricing .wp-block-button__link { width: 100%; text-align: center; }
+.adcanvas-price { font-size: 2.75rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin: 0; }
+.adcanvas-price small { font-size: 1rem; font-weight: 500; color: var(--wp--preset--color--muted); letter-spacing: 0; }
+.adcanvas-badge { position: absolute; top: -.8rem; left: 50%; transform: translateX(-50%); background: var(--wp--preset--gradient--brand); color: #fff; font-size: .75rem; font-weight: 700; padding: .25rem .75rem; border-radius: 999px; letter-spacing: .04em; text-transform: uppercase; margin: 0; white-space: nowrap; }
+
+/* ── Testimonials ─────────────────────────────────────── */
+.adcanvas-quote { margin: 0; font-size: var(--wp--preset--font-size--medium); }
+.adcanvas-quote cite, .adcanvas-quote .adcanvas-quote-by { font-style: normal; font-weight: 600; font-size: .9rem; color: var(--wp--preset--color--muted); }
+
+/* ── FAQ (details block) ──────────────────────────────── */
+.wp-block-details { border-bottom: 1px solid var(--wp--preset--color--line); padding-block: 1rem; }
+.wp-block-details summary { font-weight: 650; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 1rem; font-size: 1.05rem; }
+.wp-block-details summary::-webkit-details-marker { display: none; }
+.wp-block-details summary::after { content: "+"; color: var(--wp--preset--color--brand); font-weight: 400; font-size: 1.4rem; line-height: 1; transition: transform .2s ease; }
+.wp-block-details[open] summary::after { transform: rotate(45deg); }
+.wp-block-details > :not(summary) { color: var(--wp--preset--color--muted); margin-top: .6rem; }
+
+/* ── CTA band ─────────────────────────────────────────── */
+.adcanvas-cta { border-radius: 24px; position: relative; overflow: hidden; }
+.adcanvas-cta h2, .adcanvas-cta p { color: #fff; }
+
+/* ── Blog ─────────────────────────────────────────────── */
+.adcanvas-post-card { height: 100%; }
+.adcanvas-post-card .wp-block-post-featured-image { margin-bottom: .9rem; overflow: hidden; }
+.adcanvas-post-card .wp-block-post-featured-image img { aspect-ratio: 16 / 9; object-fit: cover; transition: transform .3s ease; }
+.adcanvas-post-card:hover .wp-block-post-featured-image img { transform: scale(1.03); }
+.adcanvas-post-card .wp-block-post-title { font-size: var(--wp--preset--font-size--large); margin-block: .35rem; }
+.adcanvas-post-card .wp-block-post-title a:hover { color: var(--wp--preset--color--brand); text-decoration: none; }
+.wp-block-post-terms a { color: var(--wp--preset--color--brand); }
+.adcanvas-reading-time { white-space: nowrap; }
+.wp-block-query-pagination { gap: .5rem; }
+.wp-block-query-pagination .page-numbers { padding: .3rem .7rem; border-radius: 8px; }
+.wp-block-query-pagination .page-numbers.current { background: var(--wp--preset--color--brand-soft); color: var(--wp--preset--color--brand-dark); font-weight: 600; }
+
+/* Long-form content (posts, legal) */
+.adcanvas-prose { font-size: 1.075rem; }
+.adcanvas-prose :where(h2) { font-size: var(--wp--preset--font-size--x-large); margin-top: 2.5rem; }
+.adcanvas-prose :where(h3) { font-size: var(--wp--preset--font-size--large); margin-top: 2rem; }
+.adcanvas-prose :where(a) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.adcanvas-prose :where(ul, ol) { padding-left: 1.4rem; }
+.adcanvas-prose :where(li + li) { margin-top: .35rem; }
+.adcanvas-prose :where(table) { width: 100%; border-collapse: collapse; }
+.adcanvas-prose :where(th, td) { border: 1px solid var(--wp--preset--color--line); padding: .55rem .75rem; vertical-align: top; text-align: left; }
+.adcanvas-prose :where(th) { background: var(--wp--preset--color--surface); }
+.adcanvas-prose :where(:not(pre) > code) { background: var(--wp--preset--color--surface); padding: .1em .35em; border-radius: 5px; font-size: .9em; }
+.adcanvas-prose :where(blockquote) { border-left: 4px solid var(--wp--preset--color--brand); margin-left: 0; padding-left: 1.25rem; }
+.adcanvas-legal :where(h2) { font-size: var(--wp--preset--font-size--large); }
+
+/* ── Search form ──────────────────────────────────────── */
+.wp-block-search__input { border: 1px solid var(--wp--preset--color--line); border-radius: 10px; padding: .65rem .9rem; font: inherit; }
+.wp-block-search__button { border-radius: 10px; margin-left: .5rem; }
+
+/* ── Footer ───────────────────────────────────────────── */
+.adcanvas-footer { border-top: 1px solid var(--wp--preset--color--line); }
+.adcanvas-footer h2 { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--wp--preset--color--contrast); margin-bottom: .75rem; }
+.adcanvas-footer .wp-block-navigation { --navigation-layout-direction: column; }
+.adcanvas-footer ul.adcanvas-links { list-style: none; padding: 0; margin: 0; }
+.adcanvas-footer ul.adcanvas-links li { margin-block: .45rem; }
+.adcanvas-footer ul.adcanvas-links a { color: var(--wp--preset--color--muted); font-size: .95rem; }
+.adcanvas-footer ul.adcanvas-links a:hover { color: var(--wp--preset--color--brand); }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 781px) {
+  .adcanvas-hero h1 { max-width: none; }
+  .adcanvas-pricing .wp-block-column + .wp-block-column { margin-top: var(--wp--preset--spacing--40); }
+}

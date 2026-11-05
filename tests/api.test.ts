@@ -232,6 +232,22 @@ describe("workspaces & boards", () => {
   });
 });
 
+describe("marketing site", () => {
+  test("MARKETING_URL is exposed in status and legal pages redirect to it", async () => {
+    delete process.env.MARKETING_URL;
+    assert.equal((await (await fetch(base + "/api/status")).json()).marketingUrl, null);
+    process.env.MARKETING_URL = "https://adcanvas.example/";
+    try {
+      assert.equal((await (await fetch(base + "/api/status")).json()).marketingUrl, "https://adcanvas.example");
+      const r = await fetch(base + "/legal/privacy", { redirect: "manual" });
+      assert.equal(r.status, 302);
+      assert.equal(r.headers.get("location"), "https://adcanvas.example/legal/privacy/");
+    } finally {
+      delete process.env.MARKETING_URL;
+    }
+  });
+});
+
 describe("security primitives", () => {
   test("rate limiter blocks bursts", async () => {
     const { rateLimit } = await import("../server/auth");
