@@ -124,6 +124,28 @@ export const api = {
   asset: (graph: Graph, nodeId: string, kind: AssetKind, instructions: string, onText: (t: string) => void, signal?: AbortSignal) =>
     stream("/api/ai/asset", { graph, nodeId, kind, instructions }, onText, signal),
   chat: (graph: Graph, history: { role: string; content: string }[], onText: (t: string) => void, signal?: AbortSignal) => stream("/api/ai/chat", { graph, history }, onText, signal),
+  /** Streams assistant events (NDJSON): text deltas, then optional proposed changes. */
+  assistant: async (graph: Graph, history: { role: string; content: string }[], onEvent: (ev: AssistantEvent) => void, signal?: AbortSignal) => {
+    const res = await fetch("/api/ai/assistant", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ graph, history }), signal });
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      throw new ApiError(data.error ?? `Request failed (${res.status})`, res.status, data);
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (line) onEvent(JSON.parse(line));
+      }
+    }
+  },
   adPack: (graph: Graph, nodeId: string, finalUrl: string, instructions?: string) => json<AdPack>("/api/ai/adpack", { graph, nodeId, finalUrl, instructions }),
 
   // Boards & collaboration
@@ -159,6 +181,11 @@ export const api = {
   publish: (b: { pack: AdPack; target: "google_ads_mgr" | "meta_ads_mgr"; campaignId?: string; pageId?: string }) => json<{ created: string[]; note: string }>("/api/publish", b),
   oauthStartUrl: (type: string) => `/api/oauth/start?type=${encodeURIComponent(type)}`,
 };
+
+export type AssistantEvent =
+  | { type: "text"; delta: string }
+  | { type: "changes"; summary: string; ops: unknown[]; described: string[]; warnings: string[] }
+  | { type: "error"; message: string };
 
 export interface BoardSummary {
   id: string;

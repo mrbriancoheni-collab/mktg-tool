@@ -52,6 +52,7 @@ export interface BoardRecord {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  proposal?: { summary: string; ops: Op[]; described: string[]; warnings: string[]; status: "pending" | "applied" | "discarded" };
 }
 
 interface Snapshot {

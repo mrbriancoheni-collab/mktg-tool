@@ -158,3 +158,43 @@ describe("GA4 connector", () => {
     assert.ok(JSON.parse(String(calls[0].init!.body)).metrics.some((m: { name: string }) => m.name === "keyEvents"));
   });
 });
+
+describe("AI canvas edits", async () => {
+  const { changesToOps, interpretDemo, blankChange } = await import("../shared/aiedit");
+  const g = {
+    name: "T",
+    nodes: [
+      { id: "t1", position: { x: 0, y: 0 }, data: { type: "meta_ads", kind: "traffic" as const, label: "Meta", budget: 1000, cpc: 1 } },
+      { id: "p1", position: { x: 320, y: 0 }, data: { type: "landing_page", kind: "page" as const, label: "LP", conversionRate: 10 } },
+      { id: "c1", position: { x: 640, y: 0 }, data: { type: "checkout", kind: "page" as const, label: "Checkout", conversionRate: 50, price: 50 } },
+    ],
+    edges: [{ id: "e1", source: "t1", target: "p1" }, { id: "e2", source: "p1", target: "c1" }],
+  };
+
+  test("add with refs, update, connect, remove", () => {
+    const { ops, warnings, described } = changesToOps(g, [
+      blankChange({ action: "add", ref: "new1", type: "upsell", from: "c1", price: 30 }),
+      blankChange({ action: "update", id: "t1", budget: 800 }),
+      blankChange({ action: "connect", from: "new1", to: "p1" }),
+      blankChange({ action: "remove", id: "nope" }),
+    ]);
+    const added = ops.find((o) => o.t === "node.put" && o.node.data.type === "upsell") as { node: { id: string; position: { x: number }; data: { price: number } } };
+    assert.equal(added.node.position.x, 960);
+    assert.equal(added.node.data.price, 30);
+    assert.ok(ops.some((o) => o.t === "edge.put" && o.edge.source === "c1" && o.edge.target === added.node.id));
+    assert.ok(ops.some((o) => o.t === "edge.put" && o.edge.source === added.node.id && o.edge.target === "p1"));
+    assert.ok(ops.some((o) => o.t === "node.put" && o.node.id === "t1" && o.node.data.budget === 800));
+    assert.equal(warnings.length, 1);
+    assert.match(described.join(" "), /budget \$1,000 → \$800/);
+  });
+
+  test("demo interpreter handles common requests", () => {
+    assert.equal(interpretDemo(g, "cut budget by 25%")!.changes[0].budget, 750);
+    assert.equal(interpretDemo(g, "add an upsell")!.changes[0].from, "c1");
+    const rt = interpretDemo(g, "Add retargeting")!;
+    assert.equal(rt.changes[0].type, "retargeting");
+    assert.equal(rt.changes[1].action, "connect");
+    assert.equal(interpretDemo(g, "remove checkout")!.changes[0].id, "c1");
+    assert.equal(interpretDemo(g, "what is ROAS?"), null);
+  });
+});

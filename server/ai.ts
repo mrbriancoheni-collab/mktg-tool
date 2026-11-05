@@ -10,9 +10,9 @@ import { AD_SPECS, formatFor, type AdPack } from "../shared/adpack";
 import { AdPackSchema, AnalysisSchema, PlanSchema, type Analysis, type Plan } from "./schemas";
 import * as demo from "./demo";
 
-const MODEL = process.env.ADCANVAS_MODEL ?? "claude-opus-5-5";
+export const MODEL = process.env.ADCANVAS_MODEL ?? "claude-opus-5-5";
 // Re-run a declined request on Anthropic's recommended fallback model.
-const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
+export const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
 
 function hasCredentials() {
   if (process.env.ADCANVAS_DEMO === "1") return false;
@@ -22,13 +22,13 @@ function hasCredentials() {
 }
 
 export const LIVE = hasCredentials();
-const client = LIVE ? new Anthropic() : null;
+export const client = LIVE ? new Anthropic() : null;
 
 export class AIError extends Error {}
 
 // ── Shared context ────────────────────────────────────────────────
 
-const SYSTEM = `You are AdCanvas, a senior performance-marketing strategist embedded in a visual campaign-planning canvas.
+export const SYSTEM = `You are AdCanvas, a senior performance-marketing strategist embedded in a visual campaign-planning canvas.
 Users map campaigns as flows: traffic sources → pages → actions → revenue, plus integrations (analytics, CRM, payments) attached for tracking.
 Be specific and quantitative. Use realistic industry benchmarks, name the assumption when you use one, and tie advice to node names on the canvas.
 Write for a busy marketer: plain language, no filler, no hype.

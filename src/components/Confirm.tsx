@@ -22,7 +22,9 @@ export function ConfirmHost() {
   const req = useConfirm((s) => s.req);
   const set = useConfirm((s) => s.set);
   const [typed, setTyped] = useState("");
-  useEffect(() => setTyped(""), [req]);
+  useEffect(() => {
+    setTyped("");
+  }, [req]);
   useEffect(() => {
     if (!req) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && done(false);

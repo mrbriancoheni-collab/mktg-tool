@@ -597,3 +597,14 @@ b.good { color: var(--good); }
   .topbar { overflow-x: auto; }
   .title-input { min-width: 100px; }
 }
+
+/* AI edit proposals */
+.proposal { margin-top: 10px; background: white; border: 1px solid var(--brand); border-radius: 10px; padding: 10px 12px; }
+.proposal.applied { border-color: var(--good); }
+.proposal.discarded { border-color: var(--line); opacity: 0.6; }
+.proposal-head { display: flex; align-items: center; gap: 6px; color: var(--brand); }
+.proposal.applied .proposal-head { color: var(--good); }
+.proposal p { margin: 4px 0; }
+.proposal ul { margin: 4px 0 8px; padding-left: 18px; font-size: 13px; }
+.proposal li { margin: 2px 0; }
+.proposal .link { display: inline-flex; align-items: center; gap: 4px; }

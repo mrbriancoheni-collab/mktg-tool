@@ -19,6 +19,7 @@ import { broadcast, closeRoom, subscribe } from "./realtime";
 import { buildReport, detectAnomalies, sendReport } from "./reports";
 import * as store from "./store";
 import { assertAiQuota, meter } from "./usage";
+import { assistant } from "./assistant";
 import { activationFunnel, recordEvents } from "./analytics";
 
 const appUrl = (req: Request) => process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
@@ -166,6 +167,22 @@ export function createApp() {
     const { graph, nodeId, finalUrl, instructions } = req.body as { graph: Graph; nodeId: string; finalUrl: string; instructions?: string };
     await assertAiQuota(req);
     return generateAdPack(graph, nodeId, finalUrl ?? "", instructions?.slice(0, 2000), meter(req, "adpack"));
+  }));
+  // Assistant: answers questions and proposes canvas edits (NDJSON stream).
+  app.post("/api/ai/assistant", requireRole("member"), wrap(async (req, res) => {
+    const { graph, history } = req.body as { graph: Graph; history: ChatTurn[] };
+    if (!graph || !history?.length) throw new HttpError(400, "Invalid request");
+    await assertAiQuota(req);
+    res.setHeader("content-type", "application/x-ndjson; charset=utf-8");
+    res.setHeader("cache-control", "no-cache");
+    res.setHeader("x-accel-buffering", "no");
+    const turns = history.slice(-20).map((t) => ({ role: t.role === "assistant" ? ("assistant" as const) : ("user" as const), content: String(t.content).slice(0, 20000) }));
+    try {
+      for await (const ev of assistant(graph, turns, meter(req, "assistant"))) res.write(JSON.stringify(ev) + "\n");
+    } catch (e) {
+      res.write(JSON.stringify({ type: "error", message: errorStatus(e)[1] }) + "\n");
+    }
+    res.end();
   }));
   app.post("/api/ai/chat", requireRole("member"), wrap(async (req, res) => {
     const { graph, history } = req.body as { graph: Graph; history: ChatTurn[] };
