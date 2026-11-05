@@ -1,0 +1,61 @@
+# Render Blueprint: one web service + managed Postgres.
+# Deploy: Render dashboard → New → Blueprint → select this repo.
+# Secrets marked `sync: false` are entered in the dashboard on first deploy.
+
+services:
+  - type: web
+    name: adcanvas
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: adcanvas-db
+          property: connectionString
+      # Generated once. NEVER change ENCRYPTION_KEY after launch — stored credentials would become unreadable.
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false # e.g. https://app.yourdomain.com
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Billing (optional — omit STRIPE_SECRET_KEY for an internal, unlimited deployment)
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_PRICE_TEAM
+        sync: false
+      # Email
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false # e.g. AdCanvas <no-reply@yourdomain.com>
+      # Monitoring
+      - key: SENTRY_DSN
+        sync: false
+      # Ad platforms (see docs/SETUP.md)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_ADS_DEVELOPER_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_API_VERSION
+        sync: false
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_GRAPH_VERSION
+        sync: false
+
+databases:
+  - name: adcanvas-db
+    plan: basic-256mb
+    databaseName: adcanvas

@@ -268,6 +268,18 @@ describe("security primitives", () => {
   });
 });
 
+describe("data retention", () => {
+  test("purge job removes expired sessions and old audit rows", async () => {
+    const { purgeExpired } = await import("../server/maintenance");
+    const [u] = await db().query(`SELECT id FROM users LIMIT 1`);
+    await db().query(`INSERT INTO sessions (id, user_id, expires_at) VALUES ('expired-sess', $1, now() - interval '1 day')`, [u.id]);
+    await db().query(`INSERT INTO audit_log (action, created_at) VALUES ('ancient', now() - interval '800 days')`);
+    await purgeExpired();
+    assert.equal((await db().query(`SELECT 1 FROM sessions WHERE id='expired-sess'`)).length, 0);
+    assert.equal((await db().query(`SELECT 1 FROM audit_log WHERE action='ancient'`)).length, 0);
+  });
+});
+
 describe("billing & plan limits", () => {
   test("Stripe webhook upgrades the plan; limits apply when billing is on", async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_dummy";

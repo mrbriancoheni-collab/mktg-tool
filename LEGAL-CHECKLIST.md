@@ -11,7 +11,7 @@ The `legal/` folder holds **templates**, which the app shows at `/legal/*`. They
 ## 2. Fill in and publish the documents
 - [ ] Replace every `[PLACEHOLDER]` in `legal/*.md` (company name, address, contacts, governing law, retention periods, providers).
 - [ ] Make sure the Privacy Policy matches what the app **actually** does: providers, data stored, retention. Update it whenever you add a tool.
-- [ ] Add "I agree to the Terms and Privacy Policy" at sign-up and record when each user accepted, once accounts exist.
+- [x] "I agree to the Terms and Privacy Policy" at sign-up, with the version and time recorded per user (`users.terms_version`, `terms_accepted_at`). When you materially change the Terms, bump `TERMS_VERSION` in `server/auth.ts`.
 - [ ] Fill in the Subprocessors list and sign DPAs with each subprocessor:
   - [ ] Anthropic (commercial terms and DPA; confirm current data-use and retention terms)
   - [ ] Hosting provider
@@ -29,7 +29,7 @@ The `legal/` folder holds **templates**, which the app shows at `/legal/*`. They
   - [ ] Appoint an EU and/or UK representative (Art. 27) if you have no establishment there but offer services there.
   - [ ] Consider a DPIA for AI features.
 - [ ] **US state privacy laws** (CCPA/CPRA and others): check the thresholds. A B2B SaaS often acts as a service provider, and the DPA's CCPA terms cover that.
-- [ ] A process for data subject requests. In-app export and delete already exist (Board menu → Privacy & data). Add an identity-verification step once you have accounts.
+- [x] Data subject requests. Users can export workspace data, delete workspaces and delete their own accounts in the app. Requests arriving by email are checked against the account email.
 - [ ] A cookie consent banner **only if** you add non-essential analytics or marketing tags. The app currently uses only strictly necessary storage.
 
 ## 4. ⚠️ Ad-platform API requirements
@@ -64,7 +64,9 @@ These apply to your customers' campaigns. The Terms and Acceptable Use Policy pu
 - [ ] Avoid claiming that forecasts or AI output guarantee results. The Terms disclaim this, so keep marketing copy consistent with them.
 
 ## 7. Security (needed to sell to larger businesses)
-- [ ] Authentication with MFA, role-based access, and encryption of stored integration credentials. Credentials are currently a local JSON file with restricted file permissions; move them into encrypted DB columns or a secrets manager before launch.
-- [ ] Audit logging, backups, and a written incident response plan.
+- [x] Authentication, role-based access, encrypted integration credentials (AES-256-GCM), and an audit log. See `SECURITY.md`.
+- [ ] Add MFA and SSO for enterprise customers.
+- [x] Audit logging and data-retention purge jobs.
+- [ ] Turn on database backups and point-in-time recovery, then adapt the policy templates in `docs/security/`: incident response, access control, retention, backup and disaster recovery, vendors, secure development.
 - [ ] Prepare answers for security questionnaires. Plan SOC 2 Type I, then Type II, once mid-market or enterprise customers ask for it.
 - [ ] Accessibility (WCAG 2.1 AA). It's often required in procurement, and the EU Accessibility Act may apply to some services.

@@ -66,14 +66,16 @@ We are based in [COUNTRY] and our providers may process data in the United State
 
 | Data | Retention |
 |---|---|
-| Account and workspace content | While your account is active; deleted within [30] days after account closure or a deletion request, except backups, which roll off within [35] days |
+| Account and workspace content | While your account is active; deleted immediately when you delete it in the app, or within [30] days of a request; backups roll off within [35] days |
 | Integration credentials | Until you disconnect the integration or delete your account |
-| Usage logs | [90 days] |
+| Security audit log | 12 months |
+| AI usage records (for billing limits) | 24 months |
+| Server error logs | [90 days] |
 | Billing records | As required by tax and accounting law (typically [7] years) |
 
 ## 10. Security
 
-We use encryption in transit (TLS), encryption of stored credentials, access controls, and least-privilege access. No method of transmission or storage is completely secure. [Describe additional measures, e.g. SOC 2, penetration testing, once in place.]
+We use encryption in transit (TLS), AES-256 encryption of stored integration credentials, salted password hashing, role-based access controls with an audit log, and least-privilege access for our staff. No method of transmission or storage is completely secure. [Describe additional measures, e.g. SOC 2, penetration testing, once in place.]
 
 ## 11. Your rights and choices
 

@@ -4,13 +4,18 @@ import { createApp } from "./app";
 import { billingEnabled } from "./auth";
 import { openDb } from "./db";
 import { startRealtime } from "./realtime";
+import { startMaintenance } from "./maintenance";
 import { startScheduler } from "./reports";
 
 if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV ?? "development", tracesSampleRate: 0 });
 
+if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL)
+  console.warn("[warn] DATABASE_URL is not set — using an embedded database on local disk. Use managed Postgres in production.");
+
 const db = await openDb();
 await startRealtime();
 startScheduler(process.env.APP_URL);
+startMaintenance();
 
 const port = Number(process.env.PORT ?? 8787);
 const server = createApp().listen(port, () => {
