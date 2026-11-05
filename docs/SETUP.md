@@ -87,10 +87,38 @@ Also add uptime monitoring on `/healthz` (Render has this built in, or use Bette
 6. Optionally, `META_CONVERSION_ACTIONS` sets which Meta action types count as conversions. The default is `purchase,lead,complete_registration`.
 7. Meta tokens last about 60 days. Users see a "reconnect" message when theirs expire.
 
-## 8. Not yet live
+## 8. ⏳ LinkedIn and TikTok (start now)
 
-- **LinkedIn and TikTok** use preview connectors that return sample data. The live versions need LinkedIn Marketing Developer Platform approval ⏳ and TikTok Marketing API approval ⏳, then a provider module like `server/integrations/providers.ts`.
-- **HubSpot, Salesforce, Shopify, Klaviyo and others** store credentials (encrypted) but don't sync yet. Shopify and Stripe revenue can be imported today as a CSV with UTM columns.
+**LinkedIn Marketing API:**
+1. At linkedin.com/developers, create an app and verify your Company Page.
+2. Request access to the **Advertising API** (Marketing Developer Platform) ⏳.
+3. Add the redirect URL `{APP_URL}/api/oauth/callback`. Scopes: `r_ads` and `r_ads_reporting`.
+4. Set `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, and `LINKEDIN_API_VERSION` (a current `YYYYMM`; versions are supported for about a year).
+
+**TikTok Marketing API:**
+1. At business-api.tiktok.com, register as a developer and create an app ⏳ (approval required).
+2. Set the redirect URL to `{APP_URL}/api/oauth/callback`, and enable the Ads Management and Reporting permissions.
+3. Set `TIKTOK_APP_ID` and `TIKTOK_APP_SECRET`.
+
+## 9. Revenue from Shopify, HubSpot and Salesforce
+
+These attribute closed revenue to traffic sources, using UTMs (Shopify) or lead/analytics source (HubSpot, Salesforce). They're connected in **Settings → Integrations** by pasting credentials:
+- **Shopify:** create a **custom app** in the store admin with the `read_orders` scope, then paste the shop domain and Admin API token. Set `SHOPIFY_API_VERSION` (a current `YYYY-MM`).
+- **HubSpot:** create a **private app** with the `crm.objects.deals.read` scope and paste its token. Won deals are attributed using *Original Source*.
+- **Salesforce:** paste your instance URL and an access token, for example from a connected app. Set `SALESFORCE_API_VERSION` (such as `v62.0`). Won opportunities are attributed by *Lead Source*.
+
+  Access tokens expire. For production, set up a connected app with the OAuth refresh flow; this is on the roadmap.
+
+## 10. Sign in with Google, two-step verification, admin analytics
+
+- **Sign in with Google** reuses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Add the authorized redirect URI `{APP_URL}/api/auth/google/callback`. Set `GOOGLE_LOGIN=false` to hide the button.
+- **Two-step verification** (TOTP and recovery codes) is self-serve under Settings → Account. Nothing to configure.
+- **Product analytics:** set `ADMIN_EMAILS=you@company.com`, then open `/admin` to see the activation funnel. Optionally set `POSTHOG_API_KEY` (and `POSTHOG_HOST`) to forward events to PostHog.
+
+## 11. Not yet live
+
+- **Klaviyo, Mailchimp, Intercom, Zendesk and other tools** store credentials (encrypted) but don't sync data yet.
+- **Publishing to LinkedIn and TikTok:** ad packs can be exported for these platforms, but direct draft publishing exists only for Google Ads and Meta.
 
 ## 9. Before you announce it
 

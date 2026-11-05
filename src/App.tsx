@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -47,7 +47,7 @@ import { BriefModal } from "./components/BriefModal";
 import { ChatPanel } from "./components/ChatPanel";
 import { CommentsPanel } from "./components/CommentsPanel";
 import { PrivacyDialog, ReportsDialog, ShareDialog, VersionsDialog } from "./components/Dialogs";
-import { OptimizePanel } from "./components/OptimizePanel";
+const OptimizePanel = lazy(() => import("./components/OptimizePanel").then((m) => ({ default: m.OptimizePanel })));
 import { NotificationBell } from "./components/Notifications";
 import { Inspector } from "./components/Inspector";
 import { KpiBar } from "./components/KpiBar";
@@ -56,10 +56,11 @@ import { api, type IntegrationInfo } from "./lib/api";
 import { download, parseActualsCSV, parseRevenueCSV } from "./lib/format";
 import { toGraph, useStore, type Panel } from "./lib/store";
 import { useBoardSync } from "./lib/sync";
-import { SettingsDialog, type SettingsTab } from "./components/SettingsDialog";
+import type { SettingsTab } from "./components/SettingsDialog";
+const SettingsDialog = lazy(() => import("./components/SettingsDialog").then((m) => ({ default: m.SettingsDialog })));
 import { AutoMatchDialog } from "./components/Integrations";
-import { Dashboard } from "./components/Dashboard";
-import { exportDeck } from "./lib/exports";
+const Dashboard = lazy(() => import("./components/Dashboard").then((m) => ({ default: m.Dashboard })));
+
 import { ConfirmHost } from "./components/Confirm";
 import { Checklist, Tour } from "./components/Onboarding";
 import { track } from "./lib/track";
@@ -404,6 +405,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                 onDeck={async () => {
                   flash("Building your presentation…");
                   try {
+                    const { exportDeck } = await import("./lib/exports");
                     await exportDeck({ graph, name: s.name, summary: s.summary, analysis: s.analysis, branding: s.me?.workspace.branding ?? null, workspaceName: s.me?.workspace.name ?? "" });
                     track("exported", { kind: "pptx" });
                   } catch (e) {
@@ -448,7 +450,11 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             </div>
           )}
 
-          {s.view === "dashboard" && <Dashboard onSync={sync} syncing={syncing} />}
+          {s.view === "dashboard" && (
+            <Suspense fallback={<div className="boot grow"><span className="spinner" /></div>}>
+              <Dashboard onSync={sync} syncing={syncing} />
+            </Suspense>
+          )}
           <main style={s.view === "dashboard" ? { display: "none" } : undefined} className={`canvas tool-${tool}`} data-tour="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
             <ReactFlow
               nodes={s.nodes}
@@ -559,7 +565,11 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                 ))}
               {s.panel === "analysis" && <AnalysisPanel integrations={integrations} />}
               {s.panel === "chat" && <ChatPanel />}
-              {s.panel === "optimize" && <OptimizePanel />}
+              {s.panel === "optimize" && (
+                <Suspense fallback={<span className="spinner pad" />}>
+                  <OptimizePanel />
+                </Suspense>
+              )}
               {s.panel === "comments" && <CommentsPanel />}
             </div>
           </aside>
@@ -575,7 +585,11 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             }}
           />
         )}
-        {settings && s.me && <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />}
+        {settings && s.me && (
+          <Suspense fallback={null}>
+            <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />
+          </Suspense>
+        )}
         {dialog === "share" && <ShareDialog onClose={() => setDialog(null)} />}
         <ConfirmHost />
         {matching && <AutoMatchDialog onClose={() => setMatching(false)} onDone={flash} />}

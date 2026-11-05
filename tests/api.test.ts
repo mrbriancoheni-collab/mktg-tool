@@ -235,9 +235,10 @@ describe("workspaces & boards", () => {
 describe("security primitives", () => {
   test("rate limiter blocks bursts", async () => {
     const { rateLimit } = await import("../server/auth");
-    const mw = rateLimit("t", 3, 60_000);
+    const mw = rateLimit(`t${Date.now()}`, 3, 60_000);
     const results: unknown[] = [];
-    for (let i = 0; i < 5; i++) mw({ ip: "1.2.3.4" } as never, {} as never, (e?: unknown) => results.push(e));
+    // Works for both the in-memory limiter (sync) and the Postgres-backed one (async).
+    for (let i = 0; i < 5; i++) results.push(await new Promise((r) => mw({ ip: "1.2.3.4" } as never, {} as never, (e?: unknown) => r(e))));
     assert.equal(results.filter((e) => e === undefined).length, 3);
     assert.equal((results[4] as { status: number }).status, 429);
   });
