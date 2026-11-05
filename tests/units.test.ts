@@ -219,3 +219,54 @@ describe("campaign auto-match", async () => {
     assert.equal(out[0].campaigns.length, 2);
   });
 });
+
+describe("scenarios, optimizer, experiment stats", async () => {
+  const { applyScenario, optimizeBudget, abTest, sampleSizePerVariant } = await import("../shared/optimize");
+  const g = {
+    name: "T",
+    nodes: [
+      { id: "good", data: { type: "meta_ads", kind: "traffic" as const, label: "Cheap", budget: 5000, cpc: 0.5 } },
+      { id: "bad", data: { type: "linkedin_ads", kind: "traffic" as const, label: "Pricey", budget: 5000, cpc: 5 } },
+      { id: "lp", data: { type: "landing_page", kind: "page" as const, label: "LP", conversionRate: 10 } },
+      { id: "co", data: { type: "checkout", kind: "page" as const, label: "CO", conversionRate: 50, price: 100 } },
+    ],
+    edges: [{ id: "a", source: "good", target: "lp" }, { id: "b", source: "bad", target: "lp" }, { id: "c", source: "lp", target: "co" }],
+  };
+  test("scenario raises CPC and lowers revenue", () => {
+    const base = simulate(g as never).totals;
+    const worse = simulate(applyScenario(g as never, { cpc: 30, conversion: 0, price: 0, budget: 0 }) as never).totals;
+    assert.ok(worse.revenue < base.revenue);
+    assert.equal(Math.round(worse.spend), Math.round(base.spend));
+  });
+  test("optimizer shifts budget toward the efficient channel, keeping total budget", () => {
+    const r = optimizeBudget(g as never, "profit")!;
+    const good = r.budgets.find((b) => b.nodeId === "good")!, bad = r.budgets.find((b) => b.nodeId === "bad")!;
+    assert.ok(good.to > good.from && bad.to < bad.from);
+    assert.ok(Math.abs(good.to + bad.to - 10000) <= 2);
+    assert.ok(r.after.profit >= r.before.profit);
+    assert.ok(bad.to >= 2500, "respects the 50% floor");
+  });
+  test("A/B significance and sample size", () => {
+    const sig = abTest({ visitors: 5000, conversions: 250 }, { visitors: 5000, conversions: 320 })!;
+    assert.ok(sig.significant && sig.lift > 0.25 && sig.pValue < 0.01);
+    assert.equal(abTest({ visitors: 100, conversions: 5 }, { visitors: 100, conversions: 6 })!.significant, false);
+    const n = sampleSizePerVariant(0.05, 0.2);
+    assert.ok(n > 7000 && n < 9000, `n=${n}`);
+  });
+});
+
+describe("template gallery", () => {
+  test("every template builds a valid, plausible funnel", async () => {
+    const { TEMPLATES, buildTemplate } = await import("../shared/templates");
+    assert.ok(TEMPLATES.length >= 10);
+    for (const t of TEMPLATES) {
+      const p = buildTemplate(t.id);
+      for (const nd of p.nodes) assert.ok(CATALOG_BY_TYPE[nd.type], `${t.id}: unknown type ${nd.type}`);
+      for (const ed of p.edges) assert.ok(p.nodes.some((x) => x.id === ed.source) && p.nodes.some((x) => x.id === ed.target), `${t.id}: dangling edge`);
+      const g = { name: p.name, nodes: p.nodes.map((x) => ({ id: x.id, data: { ...Object.fromEntries(Object.entries(x).filter(([, v]) => v !== null)), kind: CATALOG_BY_TYPE[x.type].kind } })), edges: p.edges.map((x, i) => ({ id: `e${i}`, ...x, data: x.weight ? { weight: x.weight } : {} })) };
+      const tot = simulate(g as never).totals;
+      assert.ok(tot.customers > 0, `${t.id} has customers`);
+      assert.ok(tot.roas > 0.8 && tot.roas < 25, `${t.id} ROAS ${tot.roas.toFixed(2)} plausible`);
+    }
+  });
+});

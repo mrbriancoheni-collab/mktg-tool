@@ -721,3 +721,53 @@ b.good { color: var(--good); }
   .report-kpis { grid-template-columns: repeat(2, 1fr); }
   .branding-grid { grid-template-columns: 1fr; }
 }
+
+/* Phase F: gallery, optimize, experiments, mockups, notifications, versions */
+.template-filters { margin: 0 0 8px; gap: 8px; }
+.template-filters select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; font: inherit; font-size: 12px; }
+.templates { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important; max-height: 330px; overflow-y: auto; }
+.template-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.template-tags i { font-style: normal; font-size: 10px; background: #f1f2f6; color: var(--muted); padding: 1px 6px; border-radius: 999px; }
+.template-tags i.roas { background: #dcfce7; color: #166534; font-weight: 600; }
+.optimize { padding: 14px 16px 40px; }
+.optimize section { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+.optimize section:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.optimize select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+.whatif-row { display: grid; grid-template-columns: 1fr 120px 48px; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 6px; }
+.whatif-row b { text-align: right; font-size: 12px; }
+.optimize .pva { margin: 8px 0; }
+.exp-new textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; resize: vertical; margin-bottom: 6px; }
+.exp { border: 1px solid var(--line); border-left: 4px solid #c4c8d6; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.exp-running { border-left-color: var(--brand); }
+.exp-won { border-left-color: var(--good); }
+.exp-lost { border-left-color: var(--bad); }
+.exp-head { display: flex; gap: 6px; align-items: flex-start; }
+.exp-head b { flex: 1; font-size: 13px; line-height: 1.4; }
+.exp-variants { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.exp-variant { display: grid; grid-template-columns: 1fr 74px 84px 44px; gap: 6px; align-items: end; font-size: 11px; color: var(--muted); }
+.exp-variant input { width: 100%; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 12px; color: var(--ink); }
+.exp-variant label { display: flex; flex-direction: column; gap: 2px; }
+.exp-stat { margin: 4px 0 8px; }
+.exp-stat.good { color: var(--good); font-weight: 600; }
+.exp-stat.bad { color: var(--bad); font-weight: 600; }
+.exp-pill-running { background: var(--brand-soft); }
+.exp-pill-won { background: #dcfce7; color: #166534; }
+.exp-pill-lost { background: #fee2e2; color: #991b1b; }
+.track-exp { display: block; margin-top: 6px; }
+.mockup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.mockup { margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: white; }
+.mockup-art svg { width: 100%; height: auto; display: block; }
+.mockup figcaption { display: flex; align-items: center; gap: 2px; padding: 4px 6px; }
+.mockup figcaption .pill { margin-right: auto; text-transform: capitalize; }
+.notif { position: relative; }
+.notif-dot { position: absolute; top: 1px; right: 0; background: var(--bad); color: white; font-size: 9px; font-weight: 700; border-radius: 999px; padding: 0 4px; min-width: 15px; text-align: center; }
+.notif-panel { width: 360px; max-height: 460px; overflow-y: auto; }
+.notif-head { padding: 6px 8px; }
+.notif-head .link { display: inline-flex; align-items: center; gap: 4px; }
+.notif-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 8px; text-decoration: none; color: inherit; font-size: 13px; }
+.notif-item:hover { background: #f3f4f9; }
+.notif-item.unread { background: var(--brand-soft); }
+.notif-icon { color: var(--brand); margin-top: 2px; }
+.notif-body { display: block; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.versions { max-height: 340px; overflow-y: auto; margin-top: 10px; }
+.version-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding: 8px 0; }

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { BellRing, Building2, Plug, ChevronDown, Copy, CreditCard, FilePlus2, LayoutDashboard, Link2, Settings, ShieldCheck, Trash2, Users } from "lucide-react";
+import { BellRing, Building2, History, Plug, ChevronDown, Copy, CreditCard, FilePlus2, LayoutDashboard, Link2, Settings, ShieldCheck, Trash2, Users } from "lucide-react";
 import { roleAtLeast } from "../../shared/plans";
 import { api, type BoardSummary } from "../lib/api";
 import { useStore } from "../lib/store";
 import { newBoard, openBoard, saveNow } from "../lib/sync";
 import { confirmDialog } from "./Confirm";
 
-export type Dialog = "share" | "reports" | "privacy" | null;
+export type Dialog = "share" | "reports" | "privacy" | "versions" | null;
 
 const ago = (t: number) => {
   const s = (Date.now() - t) / 1000;
@@ -72,6 +72,9 @@ export function BoardMenu({ onDialog, onError, onSettings }: { onDialog: (d: Dia
           {canEdit && <button className="menu-item" onClick={() => (setOpen(false), onDialog("share"))}>
             <Link2 size={15} /> Share…
           </button>}
+          <button className="menu-item" onClick={() => (setOpen(false), onDialog("versions"))}>
+            <History size={15} /> Version history…
+          </button>
           {canEdit && <button className="menu-item" onClick={() => (setOpen(false), onDialog("reports"))}>
             <BellRing size={15} /> Reports & alerts…
           </button>}

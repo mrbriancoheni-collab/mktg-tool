@@ -3,6 +3,7 @@ import { Check, Copy, Info, Link2, Megaphone, MessageSquare, Pencil, Plug, Send,
 import { defaultUtm, formatFor, trackingUrl } from "../../shared/adpack";
 import { AdPackDialog } from "./AdPackDialog";
 import { IntegrationPanel } from "./Integrations";
+import { MockupsSection } from "./Mockups";
 import { nanoid } from "nanoid";
 import { ASSET_LABELS, CATALOG_BY_TYPE, type AssetKind } from "../../shared/catalog";
 import type { Actuals, StageData } from "../../shared/model";
@@ -185,6 +186,7 @@ export function Inspector({ node, integrations, onIntegrationsChange }: { node: 
       {active === "creative" && (
         <>
           {d.kind === "traffic" && <AdPackLauncher node={node} />}
+          {d.kind === "traffic" && <MockupsSection node={node} />}
           {!!item?.assets?.length && <AssetsSection node={node} kinds={item.assets} />}
         </>
       )}

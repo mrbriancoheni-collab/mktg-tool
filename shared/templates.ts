@@ -9,15 +9,28 @@ const node = (id: string, type: string, label: string, notes: string, extra: Par
   ...extra,
 });
 
-export type TemplateId = "ecom" | "b2b" | "webinar";
+import { MORE_TEMPLATES } from "./templates-more";
 
-export const TEMPLATES: { id: TemplateId; name: string; description: string }[] = [
-  { id: "ecom", name: "E-commerce launch", description: "Paid social + PMax → product page → checkout → upsell, with cart recovery" },
-  { id: "b2b", name: "B2B demo pipeline", description: "LinkedIn + Search → lead magnet → nurture → booked demo → close" },
-  { id: "webinar", name: "Webinar funnel", description: "Meta + YouTube → registration → live masterclass → checkout → VIP upsell" },
+export type TemplateId = "ecom" | "b2b" | "webinar" | keyof typeof MORE_TEMPLATES;
+
+export interface TemplateInfo {
+  id: TemplateId;
+  name: string;
+  description: string;
+  industry: string;
+  goal: string;
+  segment: "b2b" | "b2c";
+}
+
+export const TEMPLATES: TemplateInfo[] = [
+  { id: "ecom", name: "E-commerce launch", description: "Paid social + PMax → product page → checkout → upsell, with cart recovery", industry: "E-commerce", goal: "Sales", segment: "b2c" },
+  { id: "b2b", name: "B2B demo pipeline", description: "LinkedIn + Search → lead magnet → nurture → booked demo → close", industry: "Software", goal: "Pipeline", segment: "b2b" },
+  { id: "webinar", name: "Webinar funnel", description: "Meta + YouTube → registration → live masterclass → checkout → VIP upsell", industry: "Education & coaching", goal: "Sales", segment: "b2c" },
+  ...Object.entries(MORE_TEMPLATES).map(([id, t]) => ({ id, name: t.name, description: t.description, industry: t.industry, goal: t.goal, segment: t.segment })),
 ];
 
 export function buildTemplate(id: TemplateId, budget = 10000, product = "your offer"): PlanSpec {
+  if (id in MORE_TEMPLATES) return MORE_TEMPLATES[id].build(budget, product);
   switch (id) {
     case "b2b":
       return {

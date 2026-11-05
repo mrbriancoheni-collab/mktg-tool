@@ -16,6 +16,7 @@ import {
   CloudOff,
   Download,
   FileJson,
+  Gauge,
   FileText,
   Hand,
   Presentation,
@@ -45,7 +46,9 @@ import { BoardMenu, type Dialog } from "./components/BoardMenu";
 import { BriefModal } from "./components/BriefModal";
 import { ChatPanel } from "./components/ChatPanel";
 import { CommentsPanel } from "./components/CommentsPanel";
-import { PrivacyDialog, ReportsDialog, ShareDialog } from "./components/Dialogs";
+import { PrivacyDialog, ReportsDialog, ShareDialog, VersionsDialog } from "./components/Dialogs";
+import { OptimizePanel } from "./components/OptimizePanel";
+import { NotificationBell } from "./components/Notifications";
 import { Inspector } from "./components/Inspector";
 import { KpiBar } from "./components/KpiBar";
 import { Palette } from "./components/Palette";
@@ -417,6 +420,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               </button>
             </>
           )}
+          {s.me && <NotificationBell />}
           {s.me && (
             <button className="avatar me" title={`${s.me.user.email} · ${s.me.workspace.name} (${s.me.role}) — settings`} onClick={() => setSettings("account")}>
               {(s.me.user.name || s.me.user.email).slice(0, 1).toUpperCase()}
@@ -533,6 +537,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             <div className="tabs">
               {!ro && tab("inspector", <SlidersHorizontal size={14} />, "Inspect")}
               {tab("analysis", <BarChart3 size={14} />, "Insights")}
+              {tab("optimize", <Gauge size={14} />, "Optimize")}
               {!ro && tab("chat", <MessageCircle size={14} />, "AI")}
               {tab("comments", <MessageSquare size={14} />, "Comments", openComments)}
               {s.panel && (
@@ -554,6 +559,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                 ))}
               {s.panel === "analysis" && <AnalysisPanel integrations={integrations} />}
               {s.panel === "chat" && <ChatPanel />}
+              {s.panel === "optimize" && <OptimizePanel />}
               {s.panel === "comments" && <CommentsPanel />}
             </div>
           </aside>
@@ -577,6 +583,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
         {paletteOpen && <div className="palette-scrim" onClick={() => setPaletteOpen(false)} />}
         {dialog === "reports" && <ReportsDialog integrations={integrations} onClose={() => setDialog(null)} />}
         {dialog === "privacy" && <PrivacyDialog onClose={() => setDialog(null)} />}
+        {dialog === "versions" && <VersionsDialog onClose={() => setDialog(null)} />}
       </div>
     </SimContext.Provider>
   );

@@ -116,6 +116,16 @@ export function AnalysisPanel({ integrations }: { integrations: IntegrationInfo[
               )}
               <p>{x.test}</p>
               <span className="impact">{x.expectedImpact}</span>
+              {!readOnly && (
+                <button
+                  className="link small track-exp"
+                  onClick={() => {
+                    useStore.setState({ pendingExperiment: { hypothesis: x.hypothesis, nodeId: x.nodeId }, panel: "optimize" });
+                  }}
+                >
+                  + Track this experiment
+                </button>
+              )}
             </div>
           ))}
 

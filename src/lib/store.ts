@@ -19,7 +19,7 @@ import type { Analysis, Me } from "./api";
 export type StageNode = Node<StageData>;
 export type FlowEdge = Edge<EdgeData>;
 export type View = "build" | "analyze" | "dashboard";
-export type Panel = "inspector" | "analysis" | "chat" | "comments" | null;
+export type Panel = "inspector" | "analysis" | "optimize" | "chat" | "comments" | null;
 export type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 export interface Person {
   clientId: string;
@@ -65,6 +65,8 @@ interface State {
   me: Me | null;
   /** Branding of the board's workspace when viewing a share link. */
   shareBranding: { name?: string; color?: string; logo?: string; hidePoweredBy?: boolean } | null;
+  /** Experiment suggested by AI analysis, waiting to be added in the Optimize tab. */
+  pendingExperiment: { hypothesis: string; nodeId: string | null } | null;
   boardId: string | null;
   version: number;
   readOnly: boolean;
@@ -123,6 +125,7 @@ interface State {
 export const useStore = create<State>()((set, get) => ({
       me: null,
       shareBranding: null,
+      pendingExperiment: null,
       boardId: null,
       version: 0,
       readOnly: false,

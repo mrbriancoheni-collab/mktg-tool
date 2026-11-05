@@ -193,6 +193,17 @@ export const api = {
     json<{ connector: string; suggestions: { nodeId: string; connector: string; campaigns: { id: string; name: string; score: number }[] }[]; error?: string }[]>(`/api/boards/${boardId}/automatch`, {}),
   metaPages: () => json<{ id: string; name: string }[]>("/api/integrations/meta_ads_mgr/pages"),
   publish: (b: { pack: AdPack; target: "google_ads_mgr" | "meta_ads_mgr"; campaignId?: string; pageId?: string }) => json<{ created: string[]; note: string }>("/api/publish", b),
+  // Versions, experiments, notifications, mockups
+  versions: (boardId: string) => json<{ id: string; label: string; createdAt: number; by: string; nodes: number }[]>(`/api/boards/${boardId}/versions`),
+  saveVersion: (boardId: string, label: string) => json(`/api/boards/${boardId}/versions`, { label }),
+  getVersion: (boardId: string, vid: string) => json<{ name: string; goal: string; summary: string; graph: Graph; analysis: Analysis | null }>(`/api/boards/${boardId}/versions/${vid}`),
+  experiments: (boardId: string) => json<Experiment[]>(`/api/boards/${boardId}/experiments`),
+  createExperiment: (boardId: string, e: { hypothesis: string; nodeId?: string | null; metric?: string; variants?: { name: string }[] }) => json<Experiment>(`/api/boards/${boardId}/experiments`, e),
+  updateExperiment: (boardId: string, id: string, patch: Partial<Pick<Experiment, "status" | "variants" | "result" | "hypothesis">>) => json<Experiment>(`/api/boards/${boardId}/experiments/${id}`, patch, "PATCH"),
+  deleteExperiment: (boardId: string, id: string) => json(`/api/boards/${boardId}/experiments/${id}`, undefined, "DELETE"),
+  notifications: () => json<{ unread: number; items: { id: string; kind: string; title: string; body: string | null; link: string | null; read: boolean; createdAt: number }[] }>("/api/notifications"),
+  markRead: (ids?: string[]) => json("/api/notifications/read", { ids }),
+  mockups: (graph: Graph, nodeId: string) => json<{ variants: Mockup[] }>("/api/ai/mockups", { graph, nodeId }),
   oauthStartUrl: (type: string) => `/api/oauth/start?type=${encodeURIComponent(type)}`,
 };
 
@@ -217,6 +228,32 @@ export type AssistantEvent =
   | { type: "text"; delta: string }
   | { type: "changes"; summary: string; ops: unknown[]; described: string[]; warnings: string[] }
   | { type: "error"; message: string };
+
+export interface Experiment {
+  id: string;
+  nodeId: string | null;
+  hypothesis: string;
+  variants: { name: string; visitors: number; conversions: number }[];
+  metric: string;
+  status: "planned" | "running" | "won" | "lost" | "inconclusive";
+  result: string | null;
+  startedAt: number | null;
+  endedAt: number | null;
+  createdAt: number;
+}
+
+export interface Mockup {
+  layout: "bold-type" | "split-image" | "testimonial" | "offer-badge";
+  headline: string;
+  primary: string;
+  cta: string;
+  badge: string | null;
+  quote: string | null;
+  bg: string;
+  fg: string;
+  accent: string;
+  imagePrompt: string;
+}
 
 export interface BoardSummary {
   id: string;

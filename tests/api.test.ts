@@ -268,6 +268,48 @@ describe("security primitives", () => {
   });
 });
 
+describe("experiments, versions, notifications", () => {
+  test("experiment lifecycle and workspace isolation", async () => {
+    const a = client(), b = client();
+    await signup(a, "exp-a@test.co");
+    await signup(b, "exp-b@test.co");
+    const board = (await a.post("/api/boards", { name: "E" })).data;
+    const e = (await a.post(`/api/boards/${board.id}/experiments`, { hypothesis: "Shorter form lifts conversion" })).data;
+    assert.equal(e.variants.length, 2);
+    const u = (await a.patch(`/api/boards/${board.id}/experiments/${e.id}`, { status: "running", variants: [{ name: "A", visitors: 100, conversions: 5 }, { name: "B", visitors: 100, conversions: 9 }] })).data;
+    assert.equal(u.status, "running");
+    assert.ok(u.startedAt);
+    assert.equal((await b.get(`/api/boards/${board.id}/experiments`)).status, 404);
+  });
+
+  test("versions: save, list, fetch snapshot", async () => {
+    const a = client();
+    await signup(a, "ver@test.co");
+    const board = (await a.post("/api/boards", { name: "V1" })).data;
+    await a.post(`/api/boards/${board.id}/versions`, { label: "Sent to client" });
+    await a.post(`/api/boards/${board.id}/ops`, { ops: [{ t: "meta", patch: { name: "V2" } }] });
+    const list = (await a.get(`/api/boards/${board.id}/versions`)).data;
+    const saved = list.find((v: { label: string }) => v.label === "Sent to client");
+    assert.ok(saved);
+    assert.equal((await a.get(`/api/boards/${board.id}/versions/${saved.id}`)).data.name, "V1");
+  });
+
+  test("@mentions notify teammates", async () => {
+    const owner = client();
+    await signup(owner, "mention-owner@test.co", { name: "Olive Owner" });
+    const inv = await owner.post("/api/workspace/invites", { email: "tess.mate@test.co", role: "member" });
+    const t = client();
+    await signup(t, "tess.mate@test.co", { name: "Tess Mate", invite: inv.data.url.split("/invite/")[1] });
+    const board = (await owner.post("/api/boards", { name: "M" })).data;
+    await owner.post(`/api/boards/${board.id}/comments`, { text: "@tess can you check the budget?" });
+    const n = (await t.get("/api/notifications")).data;
+    assert.equal(n.unread, 1);
+    assert.match(n.items[0].title, /mentioned you/);
+    await t.post("/api/notifications/read", {});
+    assert.equal((await t.get("/api/notifications")).data.unread, 0);
+  });
+});
+
 describe("data retention", () => {
   test("purge job removes expired sessions and old audit rows", async () => {
     const { purgeExpired } = await import("../server/maintenance");

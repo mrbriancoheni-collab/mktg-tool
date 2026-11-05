@@ -9,7 +9,7 @@ import type { Graph } from "../shared/model";
 import { validOps } from "../shared/ops";
 import { matchCampaigns, type MatchSuggestion } from "../shared/automatch";
 import { roleAtLeast } from "../shared/plans";
-import { AIError, LIVE, analyzeFunnel, chat, generateAdPack, generateAsset, planCampaign, type ChatTurn } from "./ai";
+import { AIError, LIVE, analyzeFunnel, chat, generateAdPack, generateAsset, generateMockups, planCampaign, type ChatTurn } from "./ai";
 import { audit, authRouter, billingEnabled, effectivePlan, HttpError, originCheck, rateLimit, requireAuth, requireRole, sessionMiddleware } from "./auth";
 import { billingRouter, stripeWebhook } from "./billing";
 import { db } from "./db";
@@ -22,6 +22,7 @@ import * as store from "./store";
 import { assertAiQuota, meter } from "./usage";
 import { assistant } from "./assistant";
 import { activationFunnel, recordEvents } from "./analytics";
+import { adminsOf, autoSnapshot, featuresRouter, mentionedMembers, notifyUsers } from "./features";
 
 const appUrl = (req: Request) => process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
 
@@ -145,12 +146,14 @@ export function createApp() {
     const b = await store.getByShareToken(String(req.params.token));
     if (!b) throw new HttpError(404, "This share link is invalid or has been turned off.");
     const c = await store.addComment(b.id, commentInput(req, null));
+    await notifyUsers(await adminsOf(b.workspaceId), { workspaceId: b.workspaceId, kind: "guest_comment", title: `${c.author} commented on shared board “${b.name}”`, body: c.text, link: `/?board=${b.id}` });
     broadcast(b.id, "comments", { comments: await store.listComments(b.id) });
     return c;
   }));
 
   // ── Everything below requires a signed-in user ──
   app.use("/api", billingRouter);
+  app.use("/api", featuresRouter);
   app.use("/api", requireAuth);
 
   // AI
@@ -190,6 +193,11 @@ export function createApp() {
       res.write(JSON.stringify({ type: "error", message: errorStatus(e)[1] }) + "\n");
     }
     res.end();
+  }));
+  app.post("/api/ai/mockups", requireRole("member"), wrap(async (req) => {
+    const { graph, nodeId } = req.body as { graph: Graph; nodeId: string };
+    await assertAiQuota(req);
+    return generateMockups(graph, nodeId, req.auth!.workspace.branding?.color, meter(req, "mockups"));
   }));
   app.post("/api/ai/chat", requireRole("member"), wrap(async (req, res) => {
     const { graph, history } = req.body as { graph: Graph; history: ChatTurn[] };
@@ -235,6 +243,7 @@ export function createApp() {
     const { ops, clientId } = req.body ?? {};
     if (!validOps(ops)) throw new HttpError(400, "Invalid operations");
     const version = await store.applyBoardOps(req.auth!.workspace.id, String(req.params.id), ops);
+    autoSnapshot(String(req.params.id), req.auth!.user.id).catch(() => {});
     broadcast(String(req.params.id), "ops", { ops, version, clientId, by: req.auth!.user.name || req.auth!.user.email }, clientId);
     return { version };
   }));
@@ -256,6 +265,8 @@ export function createApp() {
     const b = await mustBoard(req);
     req.body.author = req.auth!.user.name || req.auth!.user.email;
     const c = await store.addComment(b.id, commentInput(req, req.auth!.user.id));
+    const mentioned = (await mentionedMembers(req.auth!.workspace.id, c.text)).filter((m) => m.id !== req.auth!.user.id);
+    await notifyUsers(mentioned.map((m) => m.id), { workspaceId: req.auth!.workspace.id, kind: "mention", title: `${c.author} mentioned you on “${b.name}”`, body: c.text, link: `/?board=${b.id}` });
     broadcast(b.id, "comments", { comments: await store.listComments(b.id) });
     return c;
   }));

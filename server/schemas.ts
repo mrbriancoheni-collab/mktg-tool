@@ -66,3 +66,21 @@ export const AdPackSchema = z.object({
     }),
   ),
 });
+
+export const MockupSchema = z.object({
+  variants: z.array(
+    z.object({
+      layout: z.enum(["bold-type", "split-image", "testimonial", "offer-badge"]).describe("Visual layout of the ad"),
+      headline: z.string().describe("On-image headline, max 40 characters"),
+      primary: z.string().describe("Supporting line, max 90 characters"),
+      cta: z.string().describe("Button text, max 18 characters"),
+      badge: z.string().nullable().describe("Short badge like '50% OFF' or 'NEW', or null"),
+      quote: z.string().nullable().describe("Customer quote for testimonial layout (max 110 chars), else null"),
+      bg: z.string().describe("Background color hex like #0f172a"),
+      fg: z.string().describe("Text color hex with strong contrast against bg"),
+      accent: z.string().describe("Accent/button color hex"),
+      imagePrompt: z.string().describe("Prompt for an image generator describing the photo/visual to place in the image area"),
+    }),
+  ),
+});
+export type MockupSet = z.infer<typeof MockupSchema>;

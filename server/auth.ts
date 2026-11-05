@@ -482,6 +482,9 @@ authRouter.post("/invites/:token/accept", requireAuth, wrap(async (req) => {
   const ws = await acceptInvite(String(req.params.token), req.auth!.user.id, req.auth!.user.email);
   await db().query(`UPDATE sessions SET workspace_id=$2 WHERE id=$1`, [req.auth!.sessionId, ws]);
   await audit(req, "member.joined", req.auth!.user.id, undefined, ws);
+  const admins = (await db().query<{ user_id: string }>(`SELECT user_id FROM memberships WHERE workspace_id=$1 AND role IN ('owner','admin') AND user_id<>$2`, [ws, req.auth!.user.id])).map((r) => r.user_id);
+  for (const u of admins)
+    await db().query(`INSERT INTO notifications (user_id, workspace_id, kind, title) VALUES ($1,$2,'member_joined',$3)`, [u, ws, `${req.auth!.user.name || req.auth!.user.email} joined the workspace`]);
   return { ok: true };
 }));
 
