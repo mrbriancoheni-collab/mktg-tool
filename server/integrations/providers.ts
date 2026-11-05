@@ -8,7 +8,7 @@
 
 import { defaultUtm, type AdPack } from "../../shared/adpack";
 import type { Actuals, GraphNode } from "../../shared/model";
-import type { ConnectionCtx, Connector } from "./index";
+import type { ConnectionCtx, Connector, DailyRow } from "./index";
 import { accessToken, appSecretProof, graphVersion } from "./oauth";
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
@@ -76,6 +76,17 @@ export const googleAds = {
       const m = byCampaign.get(id);
       return m && { spend: num(m.costMicros) / 1e6, impressions: num(m.impressions), clicks: num(m.clicks), conversions: num(m.conversions), revenue: num(m.conversionsValue) };
     });
+  },
+  async daily(nodes: GraphNode[], ctx: ConnectionCtx, from: string, to: string): Promise<DailyRow[]> {
+    const rows = await gaql(
+      ctx,
+      `SELECT campaign.id, segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value FROM campaign WHERE segments.date BETWEEN '${from}' AND '${to}'`,
+    );
+    return dailyByLinkedCampaigns(nodes, "google_ads_mgr", rows.map((r) => ({
+      campaignId: String(r.campaign.id),
+      day: String(r.segments.date),
+      m: { spend: num(r.metrics.costMicros) / 1e6, impressions: num(r.metrics.impressions), clicks: num(r.metrics.clicks), conversions: num(r.metrics.conversions), revenue: num(r.metrics.conversionsValue) },
+    })));
   },
   /** Creates PAUSED ad groups with responsive search ads + phrase keywords in an existing campaign. */
   async publish(ctx: ConnectionCtx, campaignId: string, pack: AdPack) {
@@ -218,6 +229,36 @@ export const metaAds = {
     );
     return sumByLinkedCampaigns(nodes, "meta_ads_mgr", (id) => byCampaign.get(id));
   },
+  async daily(nodes: GraphNode[], ctx: ConnectionCtx, from: string, to: string): Promise<DailyRow[]> {
+    const types = new Set(conversionActions());
+    const out: { campaignId: string; day: string; m: Actuals }[] = [];
+    let after: string | undefined;
+    for (let page = 0; page < 20; page++) {
+      const r = (await meta(ctx, `${act(ctx)}/insights`, {
+        level: "campaign",
+        time_increment: "1",
+        time_range: JSON.stringify({ since: from, until: to }),
+        fields: "campaign_id,spend,impressions,clicks,actions,action_values,date_start",
+        limit: "500",
+        ...(after ? { after } : {}),
+      })) as { data?: { campaign_id: string; date_start: string; spend: string; impressions: string; clicks: string; actions?: { action_type: string; value: string }[]; action_values?: { action_type: string; value: string }[] }[]; paging?: { cursors?: { after?: string }; next?: string } };
+      for (const row of r.data ?? [])
+        out.push({
+          campaignId: row.campaign_id,
+          day: row.date_start,
+          m: {
+            spend: num(row.spend),
+            impressions: num(row.impressions),
+            clicks: num(row.clicks),
+            conversions: (row.actions ?? []).filter((a) => types.has(a.action_type)).reduce((s, a) => s + num(a.value), 0),
+            revenue: (row.action_values ?? []).filter((a) => a.action_type === "purchase").reduce((s, a) => s + num(a.value), 0),
+          },
+        });
+      if (!r.paging?.next || !r.paging.cursors?.after) break;
+      after = r.paging.cursors.after;
+    }
+    return dailyByLinkedCampaigns(nodes, "meta_ads_mgr", out);
+  },
   /** Creates ad creatives (not live ads) from an ad pack. Attach them to ad sets in Ads Manager. */
   async publish(ctx: ConnectionCtx, pageId: string, pack: AdPack) {
     if (!pageId) throw new Error("Choose the Facebook Page the ads will run from.");
@@ -241,6 +282,22 @@ export const metaAds = {
     return { created, note: "Ad creatives were created in your ad account. Attach them to ad sets in Ads Manager to run them." };
   },
 };
+
+/** Sums per-day campaign metrics into per-day node rows via each node's linked campaigns. */
+function dailyByLinkedCampaigns(nodes: GraphNode[], connector: string, rows: { campaignId: string; day: string; m: Actuals }[]): DailyRow[] {
+  const owner = new Map<string, string>();
+  for (const n of nodes) for (const id of (n.data.platformCampaigns as Record<string, string[]> | undefined)?.[connector] ?? []) owner.set(id, n.id);
+  const acc = new Map<string, DailyRow>();
+  for (const r of rows) {
+    const nodeId = owner.get(r.campaignId);
+    if (!nodeId) continue;
+    const k = `${nodeId}|${r.day}`;
+    const row = acc.get(k) ?? { nodeId, day: r.day, spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0 };
+    for (const f of ["spend", "impressions", "clicks", "conversions", "revenue"] as const) row[f] = Math.round(((row[f] ?? 0) + (r.m[f] ?? 0)) * 100) / 100;
+    acc.set(k, row);
+  }
+  return [...acc.values()];
+}
 
 /** Sums platform metrics across the campaign IDs linked on each node. */
 function sumByLinkedCampaigns(nodes: GraphNode[], connector: string, get: (campaignId: string) => Actuals | undefined) {
@@ -266,9 +323,9 @@ const META_TRAFFIC = ["meta_ads", "instagram_ads", "retargeting"];
 const UTM_TRAFFIC = ["microsoft_ads", "organic", "social_organic", "direct", "email_list", "sms_list", "referral", "affiliate", "influencer", "pinterest_ads", "reddit_ads", "x_ads", "linkedin_ads", "tiktok_ads", "native_ads", "sponsored_newsletter", "cold_email", "community", "pr"];
 
 export const PROVIDER_CONNECTORS: Record<string, Connector> = {
-  google_ads_mgr: { type: "google_ads_mgr", live: true, oauth: "google", fields: [], reportsOn: GOOGLE_TRAFFIC, fetchMetrics: googleAds.metrics },
+  google_ads_mgr: { type: "google_ads_mgr", live: true, oauth: "google", fields: [], reportsOn: GOOGLE_TRAFFIC, fetchMetrics: googleAds.metrics, fetchDaily: googleAds.daily },
   ga4: { type: "ga4", live: true, oauth: "google", fields: [], reportsOn: [...GOOGLE_TRAFFIC, ...META_TRAFFIC, ...UTM_TRAFFIC], fetchMetrics: ga4.metrics },
-  meta_ads_mgr: { type: "meta_ads_mgr", live: true, oauth: "meta", fields: [], reportsOn: META_TRAFFIC, fetchMetrics: metaAds.metrics },
+  meta_ads_mgr: { type: "meta_ads_mgr", live: true, oauth: "meta", fields: [], reportsOn: META_TRAFFIC, fetchMetrics: metaAds.metrics, fetchDaily: metaAds.daily },
 };
 
 export const ACCOUNT_LISTERS: Record<string, (ctx: ConnectionCtx) => Promise<{ id: string; name: string }[]>> = {

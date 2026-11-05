@@ -18,6 +18,7 @@ export function parseActualsCSV(text: string) {
       const get = (k: string) => (idx(k) >= 0 && r[idx(k)] !== "" ? Number(r[idx(k)].replace(/[$,]/g, "")) : undefined);
       return {
         node: r[nodeCol],
+        day: idx("date") >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(r[idx("date")] ?? "") ? r[idx("date")] : undefined,
         actuals: { spend: get("spend"), impressions: get("impressions"), clicks: get("clicks"), conversions: get("conversions"), revenue: get("revenue") },
       };
     });

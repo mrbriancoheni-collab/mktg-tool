@@ -173,7 +173,11 @@ export const api = {
   connect: (type: string, creds: Record<string, string>) => json(`/api/integrations/${type}/connect`, creds),
   disconnect: (type: string) => json(`/api/integrations/${type}/disconnect`, {}),
   notify: (type: string, text: string) => json(`/api/integrations/${type}/notify`, { text }),
-  sync: (graph: Graph) => json<{ actuals: Record<string, Actuals>; sources: string[]; sample: boolean; errors: string[] }>("/api/integrations/sync", { graph }),
+  sync: (graph: Graph, boardId?: string | null) =>
+    json<{ actuals: Record<string, Actuals>; sources: string[]; sample: boolean; errors: string[] }>("/api/integrations/sync", { graph, boardId }),
+  metrics: (boardId: string, from: string, to: string) => json<Metrics>(`/api/boards/${boardId}/metrics?from=${from}&to=${to}`),
+  sampleMetrics: (boardId: string) => json(`/api/boards/${boardId}/metrics/sample`, {}),
+  importMetrics: (boardId: string, rows: ({ nodeId: string; day: string } & Actuals)[]) => json(`/api/boards/${boardId}/metrics`, { rows }),
   accounts: (type: string) => json<{ id: string; name: string }[]>(`/api/integrations/${type}/accounts`),
   setAccount: (type: string, id: string, loginCustomerId?: string) => json(`/api/integrations/${type}/account`, { id, loginCustomerId }),
   campaigns: (type: string) => json<{ id: string; name: string; status: string; channel: string }[]>(`/api/integrations/${type}/campaigns`),
@@ -183,6 +187,23 @@ export const api = {
   publish: (b: { pack: AdPack; target: "google_ads_mgr" | "meta_ads_mgr"; campaignId?: string; pageId?: string }) => json<{ created: string[]; note: string }>("/api/publish", b),
   oauthStartUrl: (type: string) => `/api/oauth/start?type=${encodeURIComponent(type)}`,
 };
+
+export interface MetricTotals {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+}
+export interface Metrics {
+  from: string;
+  to: string;
+  days: (MetricTotals & { day: string })[];
+  byNode: (MetricTotals & { nodeId: string })[];
+  totals: MetricTotals;
+  previous: MetricTotals;
+  available: { first: string | null; last: string | null; sources: string[] | null };
+}
 
 export type AssistantEvent =
   | { type: "text"; delta: string }

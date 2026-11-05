@@ -18,7 +18,7 @@ import type { Analysis, Me } from "./api";
 
 export type StageNode = Node<StageData>;
 export type FlowEdge = Edge<EdgeData>;
-export type View = "build" | "analyze";
+export type View = "build" | "analyze" | "dashboard";
 export type Panel = "inspector" | "analysis" | "chat" | "comments" | null;
 export type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 export interface Person {

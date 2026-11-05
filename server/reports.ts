@@ -85,7 +85,7 @@ export async function sendReport(board: Board, appUrl?: string) {
   const s = board.schedule;
   const ws = board.workspaceId;
   if (s?.syncFirst) {
-    const r = await integrations.syncMetrics(ws, board.graph);
+    const r = await integrations.syncMetrics(ws, board.graph, board.id);
     if (Object.keys(r.actuals).length) {
       for (const n of board.graph.nodes) if (r.actuals[n.id]) n.data.actuals = { ...n.data.actuals, ...r.actuals[n.id] };
       await saveGraph(ws, board.id, board.graph);

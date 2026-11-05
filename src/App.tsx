@@ -16,6 +16,7 @@ import {
   CloudOff,
   Download,
   Hand,
+  LineChart as LineChartIcon,
   MousePointer2,
   Plus,
   Eye,
@@ -51,6 +52,7 @@ import { toGraph, useStore, type Panel } from "./lib/store";
 import { useBoardSync } from "./lib/sync";
 import { SettingsDialog, type SettingsTab } from "./components/SettingsDialog";
 import { AutoMatchDialog } from "./components/Integrations";
+import { Dashboard } from "./components/Dashboard";
 import { ConfirmHost } from "./components/Confirm";
 import { Checklist, Tour } from "./components/Onboarding";
 import { track } from "./lib/track";
@@ -199,7 +201,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   const sync = async () => {
     setSyncing(true);
     try {
-      const r = await api.sync(graph);
+      const r = await api.sync(graph, s.boardId);
       if (!r.sources.length) {
         if (r.errors?.length) return flash(`Sync failed: ${r.errors.join("; ")}`);
         flash("No connected data sources yet. Open Settings → Integrations to connect an ad account, or import a CSV.");
@@ -246,6 +248,18 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       return;
     }
     const rows = parseActualsCSV(text);
+    const dated = rows.filter((r) => r.day);
+    if (dated.length && s.boardId) {
+      const resolved = dated.flatMap((r) => {
+        const n = s.nodes.find((n) => n.id === r.node || n.data.label.toLowerCase() === r.node.toLowerCase());
+        return n ? [{ nodeId: n.id, day: r.day!, ...r.actuals }] : [];
+      });
+      await api.importMetrics(s.boardId, resolved);
+      track("data_connected", { via: "csv_dated" });
+      s.setView("dashboard");
+      flash(`Imported ${resolved.length} dated rows into the dashboard history.`);
+      return;
+    }
     const map: Record<string, (typeof rows)[number]["actuals"]> = {};
     const missed: string[] = [];
     for (const r of rows) {
@@ -295,6 +309,9 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             </button>
             <button className={s.view === "analyze" ? "on" : ""} onClick={() => s.setView("analyze")}>
               <BarChart3 size={14} /> Analyze
+            </button>
+            <button className={s.view === "dashboard" ? "on" : ""} onClick={() => s.setView("dashboard")}>
+              <LineChartIcon size={14} /> Dashboard
             </button>
           </div>
           {!ro && <SaveStatus />}
@@ -358,7 +375,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
         </header>
 
         <div className="body">
-          {!ro && (
+          {!ro && s.view !== "dashboard" && (
             <div className={`palette-wrap ${paletteOpen ? "open" : ""}`} data-tour="palette">
               <Palette
                 onAdd={(t) => {
@@ -369,7 +386,8 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             </div>
           )}
 
-          <main className={`canvas tool-${tool}`} data-tour="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+          {s.view === "dashboard" && <Dashboard onSync={sync} syncing={syncing} />}
+          <main style={s.view === "dashboard" ? { display: "none" } : undefined} className={`canvas tool-${tool}`} data-tour="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
             <ReactFlow
               nodes={s.nodes}
               edges={s.edges}

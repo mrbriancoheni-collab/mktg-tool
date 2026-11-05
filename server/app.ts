@@ -62,6 +62,12 @@ async function streamText(res: Response, gen: AsyncGenerator<string>) {
   res.end();
 }
 
+async function mustBoardById(req: Request, id: string) {
+  const b = await store.getBoard(req.auth!.workspace.id, id);
+  if (!b) throw new HttpError(404, "Board not found");
+  return b;
+}
+
 async function mustBoard(req: Request) {
   const b = await store.getBoard(req.auth!.workspace.id, String(req.params.id));
   if (!b) throw new HttpError(404, "Board not found");
@@ -305,7 +311,45 @@ export function createApp() {
     await integrations.notify(ws(req), String(req.params.type), String(req.body?.text ?? ""));
     return { ok: true };
   }));
-  app.post("/api/integrations/sync", requireRole("member"), wrap((req) => integrations.syncMetrics(ws(req), req.body.graph as Graph)));
+  app.post("/api/integrations/sync", requireRole("member"), wrap(async (req) => {
+    const boardId = req.body?.boardId ? (await mustBoardById(req, String(req.body.boardId))).id : undefined;
+    return integrations.syncMetrics(ws(req), req.body.graph as Graph, boardId);
+  }));
+
+  // Performance history for the dashboard.
+  app.get("/api/boards/:id/metrics", wrap(async (req) => {
+    const b = await mustBoard(req);
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    const to = day.test(String(req.query.to)) ? String(req.query.to) : new Date().toISOString().slice(0, 10);
+    const from = day.test(String(req.query.from)) ? String(req.query.from) : new Date(Date.now() - 29 * 86400e3).toISOString().slice(0, 10);
+    const span = Math.max(1, Math.round((Date.parse(to) - Date.parse(from)) / 86400e3) + 1);
+    const prevTo = new Date(Date.parse(from) - 86400e3).toISOString().slice(0, 10);
+    const prevFrom = new Date(Date.parse(from) - span * 86400e3).toISOString().slice(0, 10);
+    const sum = `COALESCE(sum(spend),0)::float AS spend, COALESCE(sum(impressions),0)::float AS impressions, COALESCE(sum(clicks),0)::float AS clicks, COALESCE(sum(conversions),0)::float AS conversions, COALESCE(sum(revenue),0)::float AS revenue`;
+    const days = await db().query(`SELECT to_char(day,'YYYY-MM-DD') AS day, ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3 GROUP BY day ORDER BY day`, [b.id, from, to]);
+    const byNode = await db().query(`SELECT node_id AS "nodeId", ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3 GROUP BY node_id`, [b.id, from, to]);
+    const [totals] = await db().query(`SELECT ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3`, [b.id, from, to]);
+    const [previous] = await db().query(`SELECT ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3`, [b.id, prevFrom, prevTo]);
+    const [range] = await db().query(`SELECT to_char(min(day),'YYYY-MM-DD') AS first, to_char(max(day),'YYYY-MM-DD') AS last, array_agg(DISTINCT source) AS sources FROM metrics_daily WHERE board_id=$1`, [b.id]);
+    return { from, to, days, byNode, totals, previous, available: range };
+  }));
+  // Fills 90 days of clearly-labelled sample history so the dashboard can be explored.
+  app.post("/api/boards/:id/metrics/sample", requireRole("member"), wrap(async (req) => {
+    const b = await mustBoard(req);
+    const traffic = b.graph.nodes.filter((n) => n.data.kind === "traffic" && n.data.budget);
+    const price = b.graph.nodes.find((n) => n.data.price)?.data.price ?? 60;
+    const to = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 89 * 86400e3).toISOString().slice(0, 10);
+    const rows = integrations.sampleDaily(traffic, from, to).map((r) => ({ ...r, revenue: Math.round((r.conversions ?? 0) * price * (0.6 + Math.random() * 0.5)) }));
+    await integrations.importDaily(ws(req), b.id, rows, "sample");
+    return { ok: true, rows: rows.length };
+  }));
+  app.post("/api/boards/:id/metrics", requireRole("member"), wrap(async (req) => {
+    const b = await mustBoard(req);
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    await integrations.importDaily(ws(req), b.id, rows.filter((r: { nodeId?: string }) => b.graph.nodes.some((n) => n.id === r.nodeId)));
+    return { ok: true, imported: rows.length };
+  }));
 
   // OAuth connections (Google Ads, GA4, Meta)
   const requireLive = (req: Request) => {
