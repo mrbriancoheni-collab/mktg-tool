@@ -7,6 +7,7 @@ import type { AdPack } from "../shared/adpack";
 import { ASSET_LABELS, type AssetKind } from "../shared/catalog";
 import type { Graph } from "../shared/model";
 import { validOps } from "../shared/ops";
+import { matchCampaigns, type MatchSuggestion } from "../shared/automatch";
 import { roleAtLeast } from "../shared/plans";
 import { AIError, LIVE, analyzeFunnel, chat, generateAdPack, generateAsset, planCampaign, type ChatTurn } from "./ai";
 import { audit, authRouter, billingEnabled, effectivePlan, HttpError, originCheck, rateLimit, requireAuth, requireRole, sessionMiddleware } from "./auth";
@@ -344,6 +345,24 @@ export function createApp() {
     const ctx = await integrations.getConnection(ws(req), type);
     if (!ctx || !CAMPAIGN_LISTERS[type]) throw new HttpError(400, "Connect this integration first.");
     return CAMPAIGN_LISTERS[type](ctx);
+  }));
+  // Suggest which live campaigns belong to which canvas steps.
+  app.post("/api/boards/:id/automatch", requireRole("member"), wrap(async (req) => {
+    const b = await mustBoard(req);
+    const out: { connector: string; suggestions: MatchSuggestion[]; error?: string }[] = [];
+    for (const [type, list] of Object.entries(CAMPAIGN_LISTERS)) {
+      const ctx = await integrations.getConnection(ws(req), type);
+      const c = integrations.CONNECTORS[type];
+      if (!ctx?.account || !c?.reportsOn) continue;
+      const nodes = b.graph.nodes.filter((n) => c.reportsOn!.includes(n.data.type));
+      if (!nodes.length) continue;
+      try {
+        out.push({ connector: type, suggestions: matchCampaigns(nodes, await list(ctx), type) });
+      } catch (e) {
+        out.push({ connector: type, suggestions: [], error: (e as Error).message });
+      }
+    }
+    return out;
   }));
   app.get("/api/integrations/meta_ads_mgr/pages", requireRole("member"), wrap(async (req) => {
     const ctx = await integrations.getConnection(ws(req), "meta_ads_mgr");

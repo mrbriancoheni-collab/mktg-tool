@@ -2,6 +2,7 @@ import { useContext, useRef, useState } from "react";
 import { Check, Copy, Info, Link2, Megaphone, MessageSquare, Pencil, Plug, Send, Sparkles, Square, Trash2, X } from "lucide-react";
 import { defaultUtm, formatFor, trackingUrl } from "../../shared/adpack";
 import { AdPackDialog } from "./AdPackDialog";
+import { IntegrationPanel } from "./Integrations";
 import { nanoid } from "nanoid";
 import { ASSET_LABELS, CATALOG_BY_TYPE, type AssetKind } from "../../shared/catalog";
 import type { Actuals, StageData } from "../../shared/model";
@@ -364,52 +365,6 @@ function TrackingSection({ node }: { node: StageNode }) {
   );
 }
 
-function AccountPicker({ info, onChange }: { info: IntegrationInfo; onChange: () => void }) {
-  const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null);
-  const [error, setError] = useState("");
-  const [login, setLogin] = useState("");
-  const load = () =>
-    api
-      .accounts(info.type)
-      .then(setAccounts)
-      .catch((e) => setError((e as Error).message));
-  return (
-    <div className="account-picker">
-      <label className="field">
-        <span>{info.type === "ga4" ? "GA4 property" : "Ad account"}</span>
-        {accounts ? (
-          <select
-            value={info.account ?? ""}
-            onChange={async (e) => {
-              await api.setAccount(info.type, e.target.value, login || undefined);
-              onChange();
-            }}
-          >
-            <option value="">Choose…</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} ({a.id})
-              </option>
-            ))}
-          </select>
-        ) : (
-          <button className="btn" onClick={load}>
-            {info.account ? `Using ${info.account} — change` : "Load accounts"}
-          </button>
-        )}
-      </label>
-      {info.type === "google_ads_mgr" && accounts && (
-        <label className="field">
-          <span>Manager (MCC) ID, if accessing through one</span>
-          <input placeholder="Optional, e.g. 123-456-7890" value={login} onChange={(e) => setLogin(e.target.value)} />
-        </label>
-      )}
-      {info.needsAccount && !accounts && <p className="note small">Connected — choose which account to use.</p>}
-      {error && <div className="error">{error}</div>}
-    </div>
-  );
-}
-
 const CAMPAIGN_SOURCE: Record<string, "google_ads_mgr" | "meta_ads_mgr"> = {
   google_search: "google_ads_mgr", google_pmax: "google_ads_mgr", google_shopping: "google_ads_mgr", google_display: "google_ads_mgr", youtube_ads: "google_ads_mgr",
   meta_ads: "meta_ads_mgr", instagram_ads: "meta_ads_mgr", retargeting: "meta_ads_mgr",
@@ -452,93 +407,19 @@ function CampaignLinker({ node }: { node: StageNode }) {
           {linked.length ? `${linked.length} linked — edit` : "Link campaigns for live data"}
         </button>
       )}
-      {error && <p className="small muted">{error.includes("Connect") ? `Add and connect ${source === "google_ads_mgr" ? "Google Ads" : "Meta Ads Manager"} on the canvas first.` : error}</p>}
+      {error && <p className="small muted">{error.includes("Connect") ? `Connect ${source === "google_ads_mgr" ? "Google Ads" : "Meta Ads Manager"} in Settings → Integrations first.` : error}</p>}
     </div>
   );
 }
 
-function IntegrationSection({ node, info, onChange }: { node: StageNode; info?: IntegrationInfo; onChange: () => void }) {
-  const [creds, setCreds] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const name = useStore((s) => s.name);
+function IntegrationSection({ info, onChange }: { node: StageNode; info?: IntegrationInfo; onChange: () => void }) {
   if (!info) return null;
-
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    setBusy(true);
-    setMsg("");
-    try {
-      await fn();
-      setMsg(ok);
-      onChange();
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section>
       <h4>
         <Plug size={14} /> Connection
       </h4>
-      {!info.live && (
-        <p className="note small">
-          Preview connector: credentials are stored encrypted{info.canSync ? ", and “Sync data” returns sample metrics" : ""}. A live API integration for this tool isn't built yet.
-        </p>
-      )}
-      {info.oauth && !info.connected && (
-        <>
-          {info.oauthConfigured ? (
-            <a className="btn primary full" href={api.oauthStartUrl(info.type)}>
-              <Plug size={14} /> Connect with {info.oauth === "google" ? "Google" : "Meta"}
-            </a>
-          ) : (
-            <p className="note small">
-              {info.oauth === "google" ? "Google" : "Meta"} sign-in isn't configured on this server yet. An admin needs to add the {info.oauth === "google" ? "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET" : "META_APP_ID / META_APP_SECRET"} settings — see the README.
-            </p>
-          )}
-          {msg && <p className="small muted">{msg}</p>}
-        </>
-      )}
-      {info.oauth && info.connected && <AccountPicker info={info} onChange={onChange} />}
-      {info.connected ? (
-        <>
-          <p className="ok small">
-            <Check size={14} /> Connected{info.account ? ` · ${info.account}` : ""}
-          </p>
-          <div className="row">
-            {info.canNotify && (
-              <button className="btn" disabled={busy} onClick={() => run(() => api.notify(info.type, `AdCanvas test from “${name}” ✅`), "Test message sent.")}>
-                <Send size={14} /> Send test
-              </button>
-            )}
-            <button className="btn" disabled={busy} onClick={() => run(() => api.disconnect(info.type), "Disconnected.")}>
-              Disconnect
-            </button>
-          </div>
-        </>
-      ) : info.oauth ? null : (
-        <>
-          {info.fields.map((f) => (
-            <label className="field" key={f.key}>
-              <span>{f.label}</span>
-              <input
-                type={f.secret ? "password" : "text"}
-                placeholder={f.placeholder}
-                value={creds[f.key] ?? ""}
-                onChange={(e) => setCreds({ ...creds, [f.key]: e.target.value })}
-                autoComplete="off"
-              />
-            </label>
-          ))}
-          <button className="btn primary" disabled={busy} onClick={() => run(() => api.connect(info.type, creds), "Connected.")}>
-            <Plug size={14} /> Connect {CATALOG_BY_TYPE[node.data.type]?.label}
-          </button>
-        </>
-      )}
-      {msg && <p className="small muted">{msg}</p>}
+      <IntegrationPanel info={info} onChange={onChange} />
     </section>
   );
 }

@@ -31,6 +31,7 @@ import {
   Sparkles,
   Undo2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { defaultUtm } from "../shared/adpack";
 import { CATALOG_BY_TYPE } from "../shared/catalog";
@@ -48,7 +49,8 @@ import { api, type IntegrationInfo } from "./lib/api";
 import { download, parseActualsCSV, parseRevenueCSV } from "./lib/format";
 import { toGraph, useStore, type Panel } from "./lib/store";
 import { useBoardSync } from "./lib/sync";
-import { SettingsDialog } from "./components/SettingsDialog";
+import { SettingsDialog, type SettingsTab } from "./components/SettingsDialog";
+import { AutoMatchDialog } from "./components/Integrations";
 import { ConfirmHost } from "./components/Confirm";
 import { Checklist, Tour } from "./components/Onboarding";
 import { track } from "./lib/track";
@@ -89,7 +91,8 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   const s = useStore();
   const [tool, setTool] = useState<"hand" | "select">("hand");
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [settings, setSettings] = useState<null | "account" | "members" | "billing">(null);
+  const [settings, setSettings] = useState<null | SettingsTab>(null);
+  const [matching, setMatching] = useState(false);
   const rf = useReactFlow();
   const [showBrief, setShowBrief] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -199,7 +202,8 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       const r = await api.sync(graph);
       if (!r.sources.length) {
         if (r.errors?.length) return flash(`Sync failed: ${r.errors.join("; ")}`);
-        flash("No connected data sources. Add an ad platform or GA4 integration to the canvas and connect it, or import a CSV.");
+        flash("No connected data sources yet. Open Settings → Integrations to connect an ad account, or import a CSV.");
+        setSettings("integrations");
       } else {
         s.applyActuals(r.actuals);
         s.setView("analyze");
@@ -311,6 +315,9 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               <span className="sep" />
               <button className="btn ghost" title="Pull metrics from connected integrations" onClick={sync} disabled={syncing}>
                 <RefreshCcw size={15} className={syncing ? "spin" : ""} /> Sync data
+              </button>
+              <button className="icon-btn" title="Match live campaigns to the steps on this board" onClick={() => setMatching(true)}>
+                <Wand2 size={16} />
               </button>
               <button
                 className="btn ghost"
@@ -489,6 +496,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
         {settings && s.me && <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />}
         {dialog === "share" && <ShareDialog onClose={() => setDialog(null)} />}
         <ConfirmHost />
+        {matching && <AutoMatchDialog onClose={() => setMatching(false)} onDone={flash} />}
         {!ro && <Tour enabled={!!s.boardId} />}
         {paletteOpen && <div className="palette-scrim" onClick={() => setPaletteOpen(false)} />}
         {dialog === "reports" && <ReportsDialog integrations={integrations} onClose={() => setDialog(null)} />}

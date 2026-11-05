@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, CreditCard, History, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, Copy, CreditCard, History, Plug, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
+import { IntegrationsHub } from "./Integrations";
 import { PLANS, PUBLIC_PLANS, roleAtLeast, type Role } from "../../shared/plans";
 import { api, type Member, type Me } from "../lib/api";
 import { confirmDialog } from "./Confirm";
 import { track } from "../lib/track";
 
-type Tab = "account" | "members" | "billing" | "workspace" | "audit";
+export type SettingsTab = "account" | "members" | "integrations" | "billing" | "workspace" | "audit";
+type Tab = SettingsTab;
 
 export function SettingsDialog({ me, initialTab = "account", onClose, onChanged }: { me: Me; initialTab?: Tab; onClose: () => void; onChanged: () => void }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -14,6 +16,7 @@ export function SettingsDialog({ me, initialTab = "account", onClose, onChanged 
   const tabs: [Tab, string, React.ReactNode, boolean][] = [
     ["account", "Account", <Settings size={14} />, true],
     ["members", "Members", <Users size={14} />, true],
+    ["integrations", "Integrations", <Plug size={14} />, true],
     ["billing", "Plan & usage", <CreditCard size={14} />, true],
     ["workspace", "Workspace", <Settings size={14} />, admin],
     ["audit", "Audit log", <History size={14} />, admin],
@@ -40,6 +43,7 @@ export function SettingsDialog({ me, initialTab = "account", onClose, onChanged 
           <div className="settings-panel">
             {tab === "account" && <AccountTab me={me} onChanged={onChanged} />}
             {tab === "members" && <MembersTab me={me} admin={admin} owner={owner} onChanged={onChanged} />}
+            {tab === "integrations" && <IntegrationsHub me={me} />}
             {tab === "billing" && <BillingTab me={me} owner={owner} />}
             {tab === "workspace" && <WorkspaceTab me={me} owner={owner} onChanged={onChanged} />}
             {tab === "audit" && <AuditTab />}

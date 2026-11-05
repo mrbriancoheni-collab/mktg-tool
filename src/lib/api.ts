@@ -177,6 +177,8 @@ export const api = {
   accounts: (type: string) => json<{ id: string; name: string }[]>(`/api/integrations/${type}/accounts`),
   setAccount: (type: string, id: string, loginCustomerId?: string) => json(`/api/integrations/${type}/account`, { id, loginCustomerId }),
   campaigns: (type: string) => json<{ id: string; name: string; status: string; channel: string }[]>(`/api/integrations/${type}/campaigns`),
+  automatch: (boardId: string) =>
+    json<{ connector: string; suggestions: { nodeId: string; connector: string; campaigns: { id: string; name: string; score: number }[] }[]; error?: string }[]>(`/api/boards/${boardId}/automatch`, {}),
   metaPages: () => json<{ id: string; name: string }[]>("/api/integrations/meta_ads_mgr/pages"),
   publish: (b: { pack: AdPack; target: "google_ads_mgr" | "meta_ads_mgr"; campaignId?: string; pageId?: string }) => json<{ created: string[]; note: string }>("/api/publish", b),
   oauthStartUrl: (type: string) => `/api/oauth/start?type=${encodeURIComponent(type)}`,

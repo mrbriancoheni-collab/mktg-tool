@@ -198,3 +198,24 @@ describe("AI canvas edits", async () => {
     assert.equal(interpretDemo(g, "what is ROAS?"), null);
   });
 });
+
+describe("campaign auto-match", async () => {
+  const { matchCampaigns } = await import("../shared/automatch");
+  const n = (id: string, type: string, label: string, utm?: string) => ({ id, data: { type, kind: "traffic" as const, label, utm: utm ? { campaign: utm } : undefined } });
+  test("matches by channel keywords and names", () => {
+    const nodes = [n("s", "google_search", "Google – High-Intent Keywords"), n("p", "google_pmax", "PMax – Shopping"), n("r", "retargeting", "Retargeting – Site Visitors")];
+    const out = matchCampaigns(nodes as never, [
+      { id: "1", name: "US | Search | NonBrand" },
+      { id: "2", name: "PMax - All Products" },
+      { id: "3", name: "RMKT 30d visitors" },
+    ], "google_ads_mgr");
+    const where = (cid: string) => out.find((s) => s.campaigns.some((c) => c.id === cid))?.nodeId;
+    assert.equal(where("1"), "s");
+    assert.equal(where("2"), "p");
+    assert.equal(where("3"), "r");
+  });
+  test("single eligible node receives all campaigns", () => {
+    const out = matchCampaigns([n("m", "meta_ads", "Meta – Cold")] as never, [{ id: "a", name: "Prospecting LAL" }, { id: "b", name: "Broad UGC" }], "meta_ads_mgr");
+    assert.equal(out[0].campaigns.length, 2);
+  });
+});

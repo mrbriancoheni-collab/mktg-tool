@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BellRing, Building2, ChevronDown, Copy, CreditCard, FilePlus2, LayoutDashboard, Link2, Settings, ShieldCheck, Trash2, Users } from "lucide-react";
+import { BellRing, Building2, Plug, ChevronDown, Copy, CreditCard, FilePlus2, LayoutDashboard, Link2, Settings, ShieldCheck, Trash2, Users } from "lucide-react";
 import { roleAtLeast } from "../../shared/plans";
 import { api, type BoardSummary } from "../lib/api";
 import { useStore } from "../lib/store";
@@ -16,7 +16,7 @@ const ago = (t: number) => {
   return new Date(t).toLocaleDateString();
 };
 
-export function BoardMenu({ onDialog, onError, onSettings }: { onDialog: (d: Dialog) => void; onError: (m: string) => void; onSettings: (t: "account" | "members" | "billing") => void }) {
+export function BoardMenu({ onDialog, onError, onSettings }: { onDialog: (d: Dialog) => void; onError: (m: string) => void; onSettings: (t: "account" | "members" | "integrations" | "billing") => void }) {
   const [open, setOpen] = useState(false);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const boardId = useStore((s) => s.boardId);
@@ -96,6 +96,9 @@ export function BoardMenu({ onDialog, onError, onSettings }: { onDialog: (d: Dia
           ))}
           <button className="menu-item" onClick={() => (setOpen(false), onSettings("members"))}>
             <Users size={15} /> Members & invites
+          </button>
+          <button className="menu-item" onClick={() => (setOpen(false), onSettings("integrations"))}>
+            <Plug size={15} /> Integrations
           </button>
           <button className="menu-item" onClick={() => (setOpen(false), onSettings("billing"))}>
             <CreditCard size={15} /> Plan & usage
