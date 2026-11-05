@@ -10,7 +10,7 @@ import { validOps } from "../shared/ops";
 import { matchCampaigns, type MatchSuggestion } from "../shared/automatch";
 import { roleAtLeast } from "../shared/plans";
 import { AIError, LIVE, analyzeFunnel, chat, generateAdPack, generateAsset, generateMockups, planCampaign, type ChatTurn } from "./ai";
-import { audit, authRouter, billingEnabled, effectivePlan, HttpError, originCheck, rateLimit, requireAuth, requireRole, sessionMiddleware } from "./auth";
+import { audit, authRouter, billingEnabled, effectivePlan, googleLoginEnabled, HttpError, originCheck, rateLimit, requireAuth, requireRole, sessionMiddleware } from "./auth";
 import { billingRouter, stripeWebhook } from "./billing";
 import { db } from "./db";
 import * as integrations from "./integrations";
@@ -109,7 +109,7 @@ export function createApp() {
 
   // ── Public ──
   app.get("/api/status", (_req, res) =>
-    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta") } }),
+    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), googleLogin: googleLoginEnabled(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta"), linkedin: providerConfigured("linkedin"), tiktok: providerConfigured("tiktok") } }),
   );
   app.use("/api", authRouter);
 

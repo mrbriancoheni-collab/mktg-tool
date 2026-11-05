@@ -367,10 +367,13 @@ function TrackingSection({ node }: { node: StageNode }) {
   );
 }
 
-const CAMPAIGN_SOURCE: Record<string, "google_ads_mgr" | "meta_ads_mgr"> = {
+const CAMPAIGN_SOURCE: Record<string, string> = {
+  linkedin_ads: "linkedin_cm", abm_ads: "linkedin_cm", tiktok_ads: "tiktok_ads_mgr",
   google_search: "google_ads_mgr", google_pmax: "google_ads_mgr", google_shopping: "google_ads_mgr", google_display: "google_ads_mgr", youtube_ads: "google_ads_mgr",
   meta_ads: "meta_ads_mgr", instagram_ads: "meta_ads_mgr", retargeting: "meta_ads_mgr",
 };
+
+const SOURCE_NAME: Record<string, string> = { google_ads_mgr: "Google Ads", meta_ads_mgr: "Meta Ads Manager", linkedin_cm: "LinkedIn Campaign Manager", tiktok_ads_mgr: "TikTok Ads Manager" };
 
 /** Links a traffic node to live platform campaigns so "Sync data" can pull its actuals. */
 function CampaignLinker({ node }: { node: StageNode }) {
@@ -386,7 +389,7 @@ function CampaignLinker({ node }: { node: StageNode }) {
   };
   return (
     <div className="campaign-linker">
-      <span className="field-label">Linked {source === "google_ads_mgr" ? "Google Ads" : "Meta"} campaigns</span>
+      <span className="field-label">Linked {SOURCE_NAME[source]} campaigns</span>
       {list ? (
         <div className="campaign-list">
           {list.map((c) => (
@@ -409,7 +412,7 @@ function CampaignLinker({ node }: { node: StageNode }) {
           {linked.length ? `${linked.length} linked — edit` : "Link campaigns for live data"}
         </button>
       )}
-      {error && <p className="small muted">{error.includes("Connect") ? `Connect ${source === "google_ads_mgr" ? "Google Ads" : "Meta Ads Manager"} in Settings → Integrations first.` : error}</p>}
+      {error && <p className="small muted">{error.includes("Connect") ? `Connect ${SOURCE_NAME[source]} in Settings → Integrations first.` : error}</p>}
     </div>
   );
 }

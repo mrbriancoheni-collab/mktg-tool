@@ -13,6 +13,7 @@ import { decrypt, encrypt } from "../crypto";
 import { db } from "../db";
 import { postJSON } from "../net";
 import { PROVIDER_CONNECTORS } from "./providers";
+import { PROVIDER_CONNECTORS_2 } from "./providers2";
 
 export interface Credentials {
   [key: string]: string;
@@ -36,7 +37,7 @@ export interface Connector {
   type: string;
   fields: { key: string; label: string; secret?: boolean; placeholder?: string }[];
   /** Connect via OAuth instead of pasted credentials. */
-  oauth?: "google" | "meta";
+  oauth?: "google" | "meta" | "linkedin" | "tiktok";
   /** Canvas node types this account reports on. */
   reportsOn?: string[];
   live: boolean;
@@ -44,23 +45,6 @@ export interface Connector {
   /** Day-by-day metrics for [from, to] (YYYY-MM-DD), used for history and the dashboard. */
   fetchDaily?(nodes: GraphNode[], ctx: ConnectionCtx, from: string, to: string): Promise<DailyRow[]>;
   notify?(text: string, creds: Credentials): Promise<void>;
-}
-
-function sampleMetrics(nodes: GraphNode[]): Record<string, Actuals> {
-  const out: Record<string, Actuals> = {};
-  for (const n of nodes) {
-    const budget = n.data.budget ?? 0;
-    const cpc = n.data.cpc ?? 1;
-    const spend = budget * 0.4 * (0.85 + Math.random() * 0.3);
-    const clicks = spend / (cpc * (0.8 + Math.random() * 0.5));
-    out[n.id] = {
-      spend: Math.round(spend),
-      impressions: Math.round(clicks / (0.008 + Math.random() * 0.012)),
-      clicks: Math.round(clicks),
-      conversions: Math.round(clicks * (0.02 + Math.random() * 0.05)),
-    };
-  }
-  return out;
 }
 
 /** Deterministic pseudo-random sample history so previews look stable between syncs. */
@@ -81,18 +65,6 @@ export function sampleDaily(nodes: GraphNode[], from: string, to: string): Daily
   return rows;
 }
 
-const sampleConnector = (type: string, reportsOn: string[]): Connector => ({
-  type,
-  live: false,
-  reportsOn,
-  fields: [
-    { key: "account", label: "Ad account ID" },
-    { key: "token", label: "Access token", secret: true },
-  ],
-  fetchMetrics: async (nodes) => sampleMetrics(nodes),
-  fetchDaily: async (nodes, _ctx, from, to) => sampleDaily(nodes, from, to),
-});
-
 const hook = (type: string, label: string, placeholder: string, secret = false): Connector => ({
   type,
   live: true,
@@ -102,11 +74,8 @@ const hook = (type: string, label: string, placeholder: string, secret = false):
 
 const SPECIFIC: Record<string, Connector> = {
   ...PROVIDER_CONNECTORS,
-  tiktok_ads_mgr: sampleConnector("tiktok_ads_mgr", ["tiktok_ads"]),
-  linkedin_cm: sampleConnector("linkedin_cm", ["linkedin_ads"]),
+  ...PROVIDER_CONNECTORS_2,
   gtm: { type: "gtm", live: false, fields: [{ key: "container", label: "Container ID", placeholder: "GTM-XXXX" }] },
-  salesforce: { type: "salesforce", live: false, fields: [{ key: "instance", label: "Instance URL" }, { key: "token", label: "Access token", secret: true }] },
-  shopify: { type: "shopify", live: false, fields: [{ key: "shop", label: "Shop domain", placeholder: "mystore.myshopify.com" }, { key: "token", label: "Admin API token", secret: true }] },
   zapier: hook("zapier", "Catch hook URL", "https://hooks.zapier.com/..."),
   make: hook("make", "Webhook URL", "https://hook.make.com/..."),
   slack: hook("slack", "Incoming webhook URL", "https://hooks.slack.com/services/...", true),

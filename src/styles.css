@@ -771,3 +771,12 @@ b.good { color: var(--good); }
 .notif-body { display: block; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .versions { max-height: 340px; overflow-y: auto; margin-top: 10px; }
 .version-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding: 8px 0; }
+
+/* Auth & security */
+.google-btn { justify-content: center; gap: 8px; margin: 0 0 4px; text-decoration: none; }
+.center-text { text-align: center; margin: 6px 0 0; }
+.auth-card .divider { margin: 14px 0; }
+.mfa-setup { display: flex; gap: 16px; align-items: flex-start; }
+.mfa-setup img { border: 1px solid var(--line); border-radius: 8px; flex: none; }
+.mfa-setup p { margin: 0 0 8px; }
+.codes { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 13px; columns: 2; margin: 8px 0; }

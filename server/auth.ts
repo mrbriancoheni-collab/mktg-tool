@@ -6,7 +6,8 @@
 
 import express, { type NextFunction, type Request, type Response } from "express";
 import { PLANS, roleAtLeast, type PlanId, type Role } from "../shared/plans";
-import { hashPassword, newId, randomToken, sha256, verifyPassword } from "./crypto";
+import { decrypt, encrypt, hashPassword, newId, randomToken, sha256, sign, verifyPassword, verifySigned } from "./crypto";
+import { generateSecret, otpauthUrl, recoveryCodes, verifyTotp } from "./totp";
 import { db, ms, type Db } from "./db";
 import { sendEmail } from "./email";
 import { serverEvent } from "./analytics";
@@ -32,6 +33,8 @@ export interface AuthCtx {
 declare module "express-serve-static-core" {
   interface Request {
     auth?: AuthCtx;
+    /** Signed in with a password but the second factor hasn't been entered yet. */
+    mfaPending?: { sessionId: string; userId: string };
   }
 }
 
@@ -83,12 +86,16 @@ export async function sessionMiddleware(req: Request, res: Response, next: NextF
   if (!token) return next();
   try {
     const [row] = await db().query(
-      `SELECT s.id AS sid, s.expires_at, s.workspace_id, u.id AS uid, u.email, u.name
+      `SELECT s.id AS sid, s.expires_at, s.workspace_id, s.mfa_pending, u.id AS uid, u.email, u.name
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = $1`,
       [sha256(token)],
     );
     if (!row || new Date(row.expires_at as string) < new Date()) {
       setSessionCookie(res, null);
+      return next();
+    }
+    if (row.mfa_pending) {
+      req.mfaPending = { sessionId: row.sid as string, userId: row.uid as string };
       return next();
     }
     // Resolve the current workspace (fall back to the user's first membership).
@@ -146,15 +153,33 @@ export function originCheck(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
-/** Small fixed-window rate limiter (per instance). */
+/**
+ * Fixed-window rate limiter. With Postgres, counts are shared by every app
+ * instance; with the embedded database they're kept in memory.
+ */
 export function rateLimit(name: string, limit: number, windowMs: number) {
   const hits = new Map<string, { n: number; reset: number }>();
+  const tooMany = () => new HttpError(429, "Too many attempts. Please wait a minute and try again.");
   return (req: Request, _res: Response, next: NextFunction) => {
     const key = `${name}:${req.ip}`;
+    if (db().kind === "postgres") {
+      db()
+        .query<{ count: number }>(
+          `INSERT INTO rate_limits (key, count, reset_at) VALUES ($1, 1, now() + ($2 || ' milliseconds')::interval)
+           ON CONFLICT (key) DO UPDATE SET
+             count = CASE WHEN rate_limits.reset_at < now() THEN 1 ELSE rate_limits.count + 1 END,
+             reset_at = CASE WHEN rate_limits.reset_at < now() THEN EXCLUDED.reset_at ELSE rate_limits.reset_at END
+           RETURNING count`,
+          [key, String(windowMs)],
+        )
+        .then(([r]) => next(Number(r.count) > limit ? tooMany() : undefined))
+        .catch(next);
+      return;
+    }
     const now = Date.now();
     const h = hits.get(key);
     if (!h || h.reset < now) hits.set(key, { n: 1, reset: now + windowMs });
-    else if (++h.n > limit) return next(new HttpError(429, "Too many attempts. Please wait a minute and try again."));
+    else if (++h.n > limit) return next(tooMany());
     if (hits.size > 10000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
     next();
   };
@@ -172,15 +197,15 @@ function checkPassword(p: unknown) {
 }
 
 async function createSession(req: Request, res: Response, userId: string, workspaceId: string | null) {
+  const [u] = await db().query(`SELECT mfa_enabled FROM users WHERE id=$1`, [userId]);
+  const mfaPending = !!u?.mfa_enabled;
   const token = randomToken();
-  await db().query(`INSERT INTO sessions (id, user_id, workspace_id, expires_at, user_agent, ip) VALUES ($1,$2,$3, now() + interval '${SESSION_DAYS} days', $4, $5)`, [
-    sha256(token),
-    userId,
-    workspaceId,
-    (req.get("user-agent") ?? "").slice(0, 300),
-    req.ip ?? null,
-  ]);
+  await db().query(
+    `INSERT INTO sessions (id, user_id, workspace_id, expires_at, user_agent, ip, mfa_pending) VALUES ($1,$2,$3, now() + interval '${mfaPending ? "1 hour" : `${SESSION_DAYS} days`}', $4, $5, $6)`,
+    [sha256(token), userId, workspaceId, (req.get("user-agent") ?? "").slice(0, 300), req.ip ?? null, mfaPending],
+  );
   setSessionCookie(res, token);
+  return { mfaRequired: mfaPending };
 }
 
 async function createWorkspace(q: Db["query"], name: string, ownerId: string) {
@@ -260,10 +285,10 @@ authRouter.post("/auth/login", authLimiter, wrap(async (req, res) => {
     await audit(req, "user.login_failed", email);
     throw new HttpError(401, "Email or password is incorrect.");
   }
-  await createSession(req, res, u.id as string, null);
-  await audit(req, "user.login", u.id as string);
+  const { mfaRequired } = await createSession(req, res, u.id as string, null);
+  await audit(req, mfaRequired ? "user.login_password_ok_mfa_pending" : "user.login", u.id as string);
   if (req.body?.invite) await acceptInvite(String(req.body.invite), u.id as string, email).catch(() => {});
-  return { ok: true };
+  return { ok: true, mfaRequired };
 }));
 
 authRouter.post("/auth/logout", wrap(async (req, res) => {
@@ -286,8 +311,9 @@ authRouter.get("/auth/me", requireAuth, wrap(async (req) => {
     [a.workspace.id],
   );
   const lim = (n: number) => (Number.isFinite(n) ? n : null);
+  const [mf] = await db().query(`SELECT mfa_enabled, password_hash IS NOT NULL AS has_password, google_sub IS NOT NULL AS google FROM users WHERE id=$1`, [a.user.id]);
   return {
-    user: a.user,
+    user: { ...a.user, mfaEnabled: !!mf?.mfa_enabled, hasPassword: !!mf?.has_password, googleLinked: !!mf?.google },
     workspace: { ...a.workspace, plan: plan.id },
     role: a.role,
     workspaces,
@@ -352,7 +378,8 @@ authRouter.patch("/account", requireAuth, wrap(async (req) => {
 authRouter.delete("/account", requireAuth, wrap(async (req, res) => {
   const a = req.auth!;
   const [u] = await db().query(`SELECT password_hash FROM users WHERE id=$1`, [a.user.id]);
-  if (!(await verifyPassword(String(req.body?.password ?? ""), u.password_hash as string))) throw new HttpError(400, "Password is incorrect.");
+  const ok = u.password_hash ? await verifyPassword(String(req.body?.password ?? ""), u.password_hash as string) : String(req.body?.password ?? "").toLowerCase() === a.user.email;
+  if (!ok) throw new HttpError(400, u.password_hash ? "Password is incorrect." : "Type your email address to confirm.");
   const solo = await db().query(
     `SELECT m.workspace_id FROM memberships m WHERE m.user_id=$1 AND m.role='owner'
      AND NOT EXISTS (SELECT 1 FROM memberships o WHERE o.workspace_id=m.workspace_id AND o.role='owner' AND o.user_id<>$1)`,
@@ -495,4 +522,111 @@ authRouter.get("/workspace/audit", requireRole("admin"), wrap(async (req) => {
     [req.auth!.workspace.id],
   );
   return rows;
+}));
+
+// ── Two-factor authentication (TOTP) ──
+
+authRouter.post("/auth/mfa", authLimiter, wrap(async (req) => {
+  const p = req.mfaPending;
+  if (!p) throw new HttpError(400, "No sign-in is waiting for a code.");
+  const [u] = await db().query(`SELECT mfa_secret_enc, mfa_recovery FROM users WHERE id=$1`, [p.userId]);
+  const code = String(req.body?.code ?? "").trim();
+  let ok = !!u?.mfa_secret_enc && verifyTotp(decrypt<string>(u.mfa_secret_enc as string), code);
+  if (!ok && code) {
+    // Recovery codes are single-use.
+    const hashes = (u?.mfa_recovery as string[] | null) ?? [];
+    const h = sha256(code.toLowerCase());
+    if (hashes.includes(h)) {
+      ok = true;
+      await db().query(`UPDATE users SET mfa_recovery=$2 WHERE id=$1`, [p.userId, JSON.stringify(hashes.filter((x) => x !== h))]);
+      await audit(null, "user.mfa_recovery_code_used", p.userId);
+    }
+  }
+  if (!ok) {
+    await audit(null, "user.mfa_failed", p.userId);
+    throw new HttpError(401, "That code isn't valid. Check your authenticator app and try again.");
+  }
+  await db().query(`UPDATE sessions SET mfa_pending=false, expires_at = now() + interval '${SESSION_DAYS} days' WHERE id=$1`, [p.sessionId]);
+  await audit(null, "user.login", p.userId);
+  return { ok: true };
+}));
+
+authRouter.post("/account/mfa/setup", requireAuth, wrap(async (req) => {
+  const secret = generateSecret();
+  await db().query(`UPDATE users SET mfa_secret_enc=$2 WHERE id=$1 AND NOT mfa_enabled`, [req.auth!.user.id, encrypt(secret)]);
+  return { secret, otpauth: otpauthUrl(secret, req.auth!.user.email) };
+}));
+
+authRouter.post("/account/mfa/enable", requireAuth, wrap(async (req) => {
+  const [u] = await db().query(`SELECT mfa_secret_enc, mfa_enabled FROM users WHERE id=$1`, [req.auth!.user.id]);
+  if (u.mfa_enabled) throw new HttpError(400, "Two-factor authentication is already on.");
+  if (!u.mfa_secret_enc || !verifyTotp(decrypt<string>(u.mfa_secret_enc as string), String(req.body?.code ?? ""))) throw new HttpError(400, "That code doesn't match. Make sure your phone's time is correct and try again.");
+  const codes = recoveryCodes();
+  await db().query(`UPDATE users SET mfa_enabled=true, mfa_recovery=$2 WHERE id=$1`, [req.auth!.user.id, JSON.stringify(codes.map((c) => sha256(c)))]);
+  await audit(req, "user.mfa_enabled", req.auth!.user.id);
+  return { recoveryCodes: codes };
+}));
+
+authRouter.post("/account/mfa/disable", requireAuth, wrap(async (req) => {
+  const [u] = await db().query(`SELECT password_hash, mfa_secret_enc FROM users WHERE id=$1`, [req.auth!.user.id]);
+  const pwOk = u.password_hash ? await verifyPassword(String(req.body?.password ?? ""), u.password_hash as string) : false;
+  const codeOk = !!u.mfa_secret_enc && verifyTotp(decrypt<string>(u.mfa_secret_enc as string), String(req.body?.code ?? ""));
+  if (!pwOk && !codeOk) throw new HttpError(400, "Enter your password or a current authenticator code.");
+  await db().query(`UPDATE users SET mfa_enabled=false, mfa_secret_enc=NULL, mfa_recovery=NULL WHERE id=$1`, [req.auth!.user.id]);
+  await audit(req, "user.mfa_disabled", req.auth!.user.id);
+  return { ok: true };
+}));
+
+// ── Sign in with Google (OpenID Connect) ──
+// Uses GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. Register the redirect URI
+// {APP_URL}/api/auth/google/callback on the OAuth client.
+
+export const googleLoginEnabled = () => !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_LOGIN !== "false";
+
+authRouter.get("/auth/google", wrap(async (req, res) => {
+  if (!googleLoginEnabled()) throw new HttpError(400, "Google sign-in isn't configured.");
+  const state = sign({ n: randomToken(8), invite: req.query.invite ? String(req.query.invite) : undefined }, 600);
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID!,
+    redirect_uri: `${appUrl(req)}/api/auth/google/callback`,
+    response_type: "code",
+    scope: "openid email profile",
+    state,
+    prompt: "select_account",
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+}));
+
+authRouter.get("/auth/google/callback", wrap(async (req, res) => {
+  const fail = (m: string) => res.redirect(`/login?error=${encodeURIComponent(m)}`);
+  const st = verifySigned<{ invite?: string }>(String(req.query.state ?? ""));
+  if (!st || !req.query.code) return fail("Google sign-in expired — please try again.");
+  const tok = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ code: String(req.query.code), client_id: process.env.GOOGLE_CLIENT_ID!, client_secret: process.env.GOOGLE_CLIENT_SECRET!, redirect_uri: `${appUrl(req)}/api/auth/google/callback`, grant_type: "authorization_code" }),
+    signal: AbortSignal.timeout(15000),
+  }).then((r) => r.json() as Promise<{ access_token?: string }>);
+  if (!tok.access_token) return fail("Google sign-in failed.");
+  const info = (await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { authorization: `Bearer ${tok.access_token}` }, signal: AbortSignal.timeout(15000) }).then((r) => r.json())) as { sub?: string; email?: string; email_verified?: boolean; name?: string };
+  if (!info.sub || !info.email || !info.email_verified) return fail("Your Google account email isn't verified.");
+  const email = info.email.toLowerCase();
+  let [u] = await db().query(`SELECT id FROM users WHERE google_sub=$1`, [info.sub]);
+  if (!u) {
+    [u] = await db().query(`SELECT id FROM users WHERE email=$1`, [email]);
+    if (u) await db().query(`UPDATE users SET google_sub=$2 WHERE id=$1`, [u.id, info.sub]);
+  }
+  let ws: string | null = null;
+  if (!u) {
+    // New account via Google: the sign-in button states that continuing accepts the Terms and Privacy Policy.
+    const id = newId();
+    await db().query(`INSERT INTO users (id, email, name, google_sub, terms_version, terms_accepted_at) VALUES ($1,$2,$3,$4,$5, now())`, [id, email, (info.name ?? "").slice(0, 80), info.sub, TERMS_VERSION]);
+    ws = st.invite ? await acceptInvite(st.invite, id, email).catch(() => null) : null;
+    if (!ws) ws = await db().tx((q) => createWorkspace(q, `${info.name || email.split("@")[0]}'s workspace`, id));
+    serverEvent("signup", id, ws, { via: "google" });
+    await audit(req, "user.signup", id, { via: "google", termsVersion: TERMS_VERSION }, ws);
+    u = { id };
+  } else if (st.invite) ws = await acceptInvite(st.invite, u.id as string, email).catch(() => null);
+  await createSession(req, res, u.id as string, ws);
+  res.redirect("/");
 }));

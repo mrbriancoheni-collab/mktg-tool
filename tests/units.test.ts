@@ -270,3 +270,63 @@ describe("template gallery", () => {
     }
   });
 });
+
+describe("TOTP", async () => {
+  const { totp, verifyTotp, base32Encode } = await import("../server/totp");
+  test("matches the RFC 6238 SHA-1 test vectors", () => {
+    const secret = base32Encode(Buffer.from("12345678901234567890"));
+    assert.equal(totp(secret, 59_000, 30, 8), "94287082");
+    assert.equal(totp(secret, 1111111109_000, 30, 8), "07081804");
+    assert.equal(totp(secret, 2000000000_000, 30, 8), "69279037");
+  });
+  test("accepts one step of clock drift only", () => {
+    const secret = base32Encode(Buffer.from("abcdefghijabcdefghij"));
+    const now = 1_800_000_000_000;
+    assert.ok(verifyTotp(secret, totp(secret, now - 30_000), now));
+    assert.ok(!verifyTotp(secret, totp(secret, now - 90_000), now));
+  });
+});
+
+describe("LinkedIn, TikTok, Shopify, HubSpot connectors", async () => {
+  process.env.LINKEDIN_API_VERSION = "202601";
+  process.env.LINKEDIN_CLIENT_ID = "li";
+  process.env.LINKEDIN_CLIENT_SECRET = "ls";
+  process.env.TIKTOK_APP_ID = "ta";
+  process.env.TIKTOK_APP_SECRET = "ts";
+  process.env.SHOPIFY_API_VERSION = "2026-01";
+  const { linkedin, tiktok, shopify, hubspot, attributeNode } = await import("../server/integrations/providers2");
+  const li = node("l", "linkedin_ads", { platformCampaigns: { linkedin_cm: ["555"] } });
+
+  test("LinkedIn daily analytics map to linked campaigns", async () => {
+    mockFetch(() => ({ elements: [{ pivotValues: ["urn:li:sponsoredCampaign:555"], dateRange: { start: { year: 2026, month: 11, day: 3 } }, costInLocalCurrency: "120.5", impressions: 9000, clicks: 40, externalWebsiteConversions: 3, conversionValueInLocalCurrency: "900" }] }));
+    const rows = await linkedin.daily([li] as never, ctx("123") as never, "2026-11-01", "2026-11-05");
+    assert.deepEqual(rows, [{ nodeId: "l", day: "2026-11-03", spend: 120.5, impressions: 9000, clicks: 40, conversions: 3, revenue: 900 }]);
+    const h = calls[0].init!.headers as Record<string, string>;
+    assert.equal(h["LinkedIn-Version"], "202601");
+    assert.match(calls[0].url, /dateRange=\(start:\(year:2026,month:11,day:1\),end:\(year:2026,month:11,day:5\)\)/);
+    assert.match(calls[0].url, /urn%3Ali%3AsponsoredAccount%3A123/);
+  });
+
+  test("TikTok report rows map to linked campaigns", async () => {
+    mockFetch(() => ({ code: 0, data: { list: [{ dimensions: { campaign_id: "9", stat_time_day: "2026-11-02 00:00:00" }, metrics: { spend: "50", impressions: "8000", clicks: "120", conversion: "6" } }] } }));
+    const rows = await tiktok.daily([node("t", "tiktok_ads", { platformCampaigns: { tiktok_ads_mgr: ["9"] } })] as never, ctx("adv1") as never, "2026-11-01", "2026-11-05");
+    assert.deepEqual(rows, [{ nodeId: "t", day: "2026-11-02", spend: 50, impressions: 8000, clicks: 120, conversions: 6 }]);
+    assert.equal((calls[0].init!.headers as Record<string, string>)["Access-Token"], "tok");
+  });
+
+  test("Shopify and HubSpot revenue is attributed by UTM / source", async () => {
+    const nodes = [node("m", "meta_ads"), node("g", "google_search"), node("e", "email_list")];
+    mockFetch(() => ({ data: { orders: { pageInfo: { hasNextPage: false }, nodes: [
+      { createdAt: "2026-11-02T10:00:00Z", totalPriceSet: { shopMoney: { amount: "80.00" } }, customerJourneySummary: { lastVisit: { utmParameters: { source: "facebook" } } } },
+      { createdAt: "2026-11-02T11:00:00Z", totalPriceSet: { shopMoney: { amount: "20.00" } }, customerJourneySummary: { lastVisit: { utmParameters: { source: "google" } } } },
+      { createdAt: "2026-11-03T11:00:00Z", totalPriceSet: { shopMoney: { amount: "15.00" } }, customerJourneySummary: null },
+    ] } } }));
+    const rows = await shopify.daily(nodes as never, { ...ctx(""), creds: { shop: "x.myshopify.com", token: "t" } } as never, "2026-11-01", "2026-11-05");
+    assert.deepEqual(rows.find((r) => r.nodeId === "m"), { nodeId: "m", day: "2026-11-02", revenue: 80, conversions: 1 });
+    assert.equal(rows.length, 2, "unattributable orders are skipped");
+    mockFetch(() => ({ results: [{ properties: { amount: "5000", closedate: "2026-11-04T00:00:00Z", hs_analytics_source: "EMAIL_MARKETING", hs_analytics_source_data_1: null } }] }));
+    const deals = await hubspot.daily(nodes as never, { ...ctx(""), creds: { token: "t" } } as never, "2026-11-01", "2026-11-05");
+    assert.deepEqual(deals, [{ nodeId: "e", day: "2026-11-04", revenue: 5000, conversions: 1 }]);
+    assert.equal(attributeNode(nodes as never, "", "", "PAID_SEARCH")?.id, "g");
+  });
+});

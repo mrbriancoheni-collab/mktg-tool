@@ -10,6 +10,7 @@ import { defaultUtm, type AdPack } from "../../shared/adpack";
 import type { Actuals, GraphNode } from "../../shared/model";
 import type { ConnectionCtx, Connector, DailyRow } from "./index";
 import { accessToken, appSecretProof, graphVersion } from "./oauth";
+import { ACCOUNT_LISTERS_2, CAMPAIGN_LISTERS_2 } from "./providers2";
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
 
@@ -332,9 +333,11 @@ export const ACCOUNT_LISTERS: Record<string, (ctx: ConnectionCtx) => Promise<{ i
   google_ads_mgr: googleAds.accounts,
   ga4: ga4.accounts,
   meta_ads_mgr: metaAds.accounts,
+  ...ACCOUNT_LISTERS_2,
 };
 
 export const CAMPAIGN_LISTERS: Record<string, (ctx: ConnectionCtx) => Promise<{ id: string; name: string; status: string; channel: string }[]>> = {
   google_ads_mgr: googleAds.campaigns,
   meta_ads_mgr: metaAds.campaigns,
+  ...CAMPAIGN_LISTERS_2,
 };

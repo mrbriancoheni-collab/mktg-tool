@@ -21,7 +21,7 @@ export interface Analysis {
 export interface IntegrationInfo {
   type: string;
   live: boolean;
-  oauth: "google" | "meta" | null;
+  oauth: "google" | "meta" | "linkedin" | "tiktok" | null;
   oauthConfigured: boolean | null;
   fields: { key: string; label: string; secret?: boolean; placeholder?: string }[];
   canNotify: boolean;
@@ -32,7 +32,7 @@ export interface IntegrationInfo {
 }
 
 export interface Me {
-  user: { id: string; email: string; name: string };
+  user: { id: string; email: string; name: string; mfaEnabled?: boolean; hasPassword?: boolean; googleLinked?: boolean };
   workspace: { id: string; name: string; plan: PlanId; subscriptionStatus: string | null; branding: Branding | null };
   role: Role;
   workspaces: { id: string; name: string; role: Role }[];
@@ -97,12 +97,16 @@ async function stream(url: string, body: unknown, onText: (full: string) => void
 }
 
 export const api = {
-  status: () => json<{ ai: "live" | "demo"; billingEnabled: boolean; oauth: { google: boolean; meta: boolean } }>("/api/status"),
+  status: () => json<{ ai: "live" | "demo"; billingEnabled: boolean; googleLogin: boolean; oauth: Record<string, boolean> }>("/api/status"),
 
   // Auth & account
   me: () => json<Me>("/api/auth/me"),
   signup: (b: { name: string; email: string; password: string; workspaceName?: string; acceptTerms: boolean; invite?: string }) => json("/api/auth/signup", b),
-  login: (b: { email: string; password: string; invite?: string }) => json("/api/auth/login", b),
+  login: (b: { email: string; password: string; invite?: string }) => json<{ ok: boolean; mfaRequired?: boolean }>("/api/auth/login", b),
+  mfa: (code: string) => json("/api/auth/mfa", { code }),
+  mfaSetup: () => json<{ secret: string; otpauth: string }>("/api/account/mfa/setup", {}),
+  mfaEnable: (code: string) => json<{ recoveryCodes: string[] }>("/api/account/mfa/enable", { code }),
+  mfaDisable: (b: { password?: string; code?: string }) => json("/api/account/mfa/disable", b),
   logout: () => json("/api/auth/logout", {}),
   forgot: (email: string) => json("/api/auth/forgot", { email }),
   reset: (token: string, password: string) => json("/api/auth/reset", { token, password }),

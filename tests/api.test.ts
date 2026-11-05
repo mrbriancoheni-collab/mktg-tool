@@ -310,6 +310,54 @@ describe("experiments, versions, notifications", () => {
   });
 });
 
+describe("two-factor authentication", () => {
+  test("enable TOTP, sign in with a code, use a recovery code once", async () => {
+    const { totp } = await import("../server/totp");
+    const a = client();
+    await signup(a, "mfa@test.co");
+    const { secret } = (await a.post("/api/account/mfa/setup", {})).data;
+    assert.equal((await a.post("/api/account/mfa/enable", { code: "000000" })).status, 400);
+    const { recoveryCodes } = (await a.post("/api/account/mfa/enable", { code: totp(secret) })).data;
+    assert.equal(recoveryCodes.length, 10);
+    assert.equal((await a.get("/api/auth/me")).data.user.mfaEnabled, true);
+
+    const b = client();
+    const login = await b.post("/api/auth/login", { email: "mfa@test.co", password: "correct horse battery" });
+    assert.equal(login.data.mfaRequired, true);
+    assert.equal((await b.get("/api/auth/me")).status, 401, "pending session can't access the app");
+    assert.equal((await b.get("/api/boards")).status, 401);
+    assert.equal((await b.post("/api/auth/mfa", { code: "123456" })).status, 401);
+    assert.equal((await b.post("/api/auth/mfa", { code: totp(secret) })).status, 200);
+    assert.equal((await b.get("/api/auth/me")).status, 200);
+
+    const c = client();
+    await c.post("/api/auth/login", { email: "mfa@test.co", password: "correct horse battery" });
+    assert.equal((await c.post("/api/auth/mfa", { code: recoveryCodes[0] })).status, 200);
+    const d = client();
+    await d.post("/api/auth/login", { email: "mfa@test.co", password: "correct horse battery" });
+    assert.equal((await d.post("/api/auth/mfa", { code: recoveryCodes[0] })).status, 401, "recovery codes are single-use");
+  });
+});
+
+describe("product analytics", () => {
+  test("events are recorded and the admin funnel is restricted", async () => {
+    const a = client();
+    await signup(a, "analytics-admin@test.co");
+    await a.post("/api/events", { events: [{ event: "board_built" }, { event: "bad event name!" }] });
+    assert.equal((await a.get("/api/admin/metrics")).status, 403);
+    process.env.ADMIN_EMAILS = "analytics-admin@test.co";
+    try {
+      const m = (await a.get("/api/admin/metrics?days=30")).data;
+      const step = (k: string) => m.steps.find((s: { step: string }) => s.step === k).users;
+      assert.ok(step("signup") >= 1 && step("board_built") >= 1);
+    } finally {
+      delete process.env.ADMIN_EMAILS;
+    }
+    const [bad] = await db().query(`SELECT count(*)::int AS n FROM events WHERE event LIKE 'bad%'`);
+    assert.equal(Number(bad.n), 0, "invalid event names are dropped");
+  });
+});
+
 describe("data retention", () => {
   test("purge job removes expired sessions and old audit rows", async () => {
     const { purgeExpired } = await import("../server/maintenance");

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, CreditCard, History, Plug, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, Copy, CreditCard, History, Plug, Settings, ShieldCheck, Trash2, UserPlus, Users, X } from "lucide-react";
 import { IntegrationsHub } from "./Integrations";
 import { PLANS, PUBLIC_PLANS, roleAtLeast, type Role } from "../../shared/plans";
 import { api, type Branding, type Member, type Me } from "../lib/api";
@@ -69,6 +69,82 @@ function useMsg() {
   return { run, view };
 }
 
+function SecuritySection({ me, onChanged }: { me: Me; onChanged: () => void }) {
+  const [setup, setSetup] = useState<{ secret: string; qr: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [disablePw, setDisablePw] = useState("");
+  const { run, view } = useMsg();
+  const on = !!me.user.mfaEnabled;
+  return (
+    <section>
+      <h4>
+        <ShieldCheck size={14} /> Two-step verification {on ? <span className="pill ok-pill">On</span> : <span className="pill muted-pill">Off</span>}
+      </h4>
+      {codes ? (
+        <div className="note small">
+          <b>Save your recovery codes.</b> Each works once if you lose your phone. They won't be shown again.
+          <pre className="codes">{codes.join("\n")}</pre>
+          <div className="row">
+            <button className="btn" onClick={() => navigator.clipboard.writeText(codes.join("\n"))}>
+              <Copy size={14} /> Copy
+            </button>
+            <button className="btn primary" onClick={() => (setCodes(null), onChanged())}>
+              I've saved them
+            </button>
+          </div>
+        </div>
+      ) : on ? (
+        <>
+          <p className="muted small">You'll enter a code from your authenticator app each time you sign in with a password.</p>
+          <div className="row">
+            <input type="password" placeholder={me.user.hasPassword ? "Password or current code" : "Current code"} value={disablePw} onChange={(e) => setDisablePw(e.target.value)} />
+            <button
+              className="btn"
+              disabled={!disablePw}
+              onClick={() => run(async () => (await api.mfaDisable(/^\d{6}$/.test(disablePw) ? { code: disablePw } : { password: disablePw }), onChanged()), "Two-step verification turned off.")}
+            >
+              Turn off
+            </button>
+          </div>
+        </>
+      ) : setup ? (
+        <div className="mfa-setup">
+          <img src={setup.qr} alt="QR code for your authenticator app" width={160} height={160} />
+          <div>
+            <p className="small">1. Scan this with Google Authenticator, 1Password, Authy or similar.</p>
+            <p className="small muted">Can't scan? Enter this key: <code>{setup.secret.replace(/(.{4})/g, "$1 ").trim()}</code></p>
+            <p className="small">2. Enter the 6-digit code it shows:</p>
+            <div className="row">
+              <input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value)} />
+              <button className="btn primary" disabled={code.length < 6} onClick={() => run(async () => setCodes((await api.mfaEnable(code)).recoveryCodes), "Two-step verification is on.")}>
+                Turn on
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="muted small">Protect your account with a code from your phone in addition to your password.</p>
+          <button
+            className="btn"
+            onClick={() =>
+              run(async () => {
+                const s = await api.mfaSetup();
+                const QR = await import("qrcode");
+                setSetup({ secret: s.secret, qr: await QR.toDataURL(s.otpauth, { margin: 1, width: 320 }) });
+              }, "")
+            }
+          >
+            Set up two-step verification
+          </button>
+        </>
+      )}
+      {view}
+    </section>
+  );
+}
+
 function AccountTab({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const [name, setName] = useState(me.user.name);
   const [pw, setPw] = useState({ current: "", next: "" });
@@ -92,6 +168,7 @@ function AccountTab({ me, onChanged }: { me: Me; onChanged: () => void }) {
           </button>
         </div>
       </section>
+      <SecuritySection me={me} onChanged={onChanged} />
       <section>
         <h4>Change password</h4>
         <div className="grid2">

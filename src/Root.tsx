@@ -9,6 +9,7 @@ import { useStore } from "./lib/store";
 import { AuthPage, type AuthMode } from "./pages/AuthPages";
 import { Landing } from "./pages/Landing";
 import { Report } from "./pages/Report";
+import { Admin } from "./pages/Admin";
 
 // Report uncaught client errors to the server (forwarded to Sentry when configured).
 const report = (message: string, stack?: string) =>
@@ -42,6 +43,7 @@ export function Root() {
   const legal = path.match(/^\/legal\/([a-z-]+)\/?$/);
   if (legal) return <LegalPage slug={legal[1]} />;
   if (path === "/report" && (params.get("share") || me)) return <Report />;
+  if (path === "/admin" && me) return <Admin />;
 
   // Public share links don't need an account.
   if (params.get("share")) return <App readOnlyShare />;

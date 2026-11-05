@@ -9,6 +9,14 @@ import { ItemIcon } from "../lib/icons";
 import { useStore } from "../lib/store";
 import { track } from "../lib/track";
 
+const PROVIDER_NAME: Record<string, string> = { google: "Google", meta: "Meta", linkedin: "LinkedIn", tiktok: "TikTok" };
+const PROVIDER_ENV: Record<string, string> = {
+  google: "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET",
+  meta: "META_APP_ID / META_APP_SECRET",
+  linkedin: "LINKEDIN_CLIENT_ID / LINKEDIN_CLIENT_SECRET",
+  tiktok: "TIKTOK_APP_ID / TIKTOK_APP_SECRET",
+};
+
 export function AccountPicker({ info, onChange }: { info: IntegrationInfo; onChange: () => void }) {
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState("");
@@ -21,7 +29,7 @@ export function AccountPicker({ info, onChange }: { info: IntegrationInfo; onCha
   return (
     <div className="account-picker">
       <label className="field">
-        <span>{info.type === "ga4" ? "GA4 property" : "Ad account"}</span>
+        <span>{info.type === "ga4" ? "GA4 property" : info.type === "tiktok_ads_mgr" ? "Advertiser" : "Ad account"}</span>
         {accounts ? (
           <select
             value={info.account ?? ""}
@@ -86,11 +94,11 @@ export function IntegrationPanel({ info, onChange }: { info: IntegrationInfo; on
         <>
           {info.oauthConfigured ? (
             <a className="btn primary full" href={api.oauthStartUrl(info.type)}>
-              <Plug size={14} /> Connect with {info.oauth === "google" ? "Google" : "Meta"}
+              <Plug size={14} /> Connect with {PROVIDER_NAME[info.oauth]}
             </a>
           ) : (
             <p className="note small">
-              {info.oauth === "google" ? "Google" : "Meta"} sign-in isn't configured on this server yet. An admin needs to add the {info.oauth === "google" ? "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET" : "META_APP_ID / META_APP_SECRET"} settings — see docs/SETUP.md.
+              {PROVIDER_NAME[info.oauth]} sign-in isn't configured on this server yet. An admin needs to add the {PROVIDER_ENV[info.oauth]} settings — see docs/SETUP.md.
             </p>
           )}
           {msg && <p className="small muted">{msg}</p>}
