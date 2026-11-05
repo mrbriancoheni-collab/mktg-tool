@@ -15,10 +15,17 @@ export const TERMS_VERSION = "2026-11-05";
 const COOKIE = "adc_session";
 const SESSION_DAYS = 30;
 
+export interface Branding {
+  name?: string;
+  color?: string;
+  logo?: string;
+  hidePoweredBy?: boolean;
+}
+
 export interface AuthCtx {
   sessionId: string;
   user: { id: string; email: string; name: string };
-  workspace: { id: string; name: string; plan: PlanId; subscriptionStatus: string | null };
+  workspace: { id: string; name: string; plan: PlanId; subscriptionStatus: string | null; branding: Branding | null };
   role: Role;
 }
 
@@ -86,13 +93,13 @@ export async function sessionMiddleware(req: Request, res: Response, next: NextF
     }
     // Resolve the current workspace (fall back to the user's first membership).
     let [m] = await db().query(
-      `SELECT w.id, w.name, w.plan, w.subscription_status, m.role FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
+      `SELECT w.id, w.name, w.plan, w.subscription_status, w.branding, m.role FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
        WHERE m.user_id = $1 AND m.workspace_id = $2`,
       [row.uid, row.workspace_id],
     );
     if (!m) {
       [m] = await db().query(
-        `SELECT w.id, w.name, w.plan, w.subscription_status, m.role FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
+        `SELECT w.id, w.name, w.plan, w.subscription_status, w.branding, m.role FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
          WHERE m.user_id = $1 ORDER BY m.created_at LIMIT 1`,
         [row.uid],
       );
@@ -102,7 +109,7 @@ export async function sessionMiddleware(req: Request, res: Response, next: NextF
     req.auth = {
       sessionId: row.sid as string,
       user: { id: row.uid as string, email: row.email as string, name: row.name as string },
-      workspace: { id: m.id as string, name: m.name as string, plan: m.plan as PlanId, subscriptionStatus: (m.subscription_status as string) ?? null },
+      workspace: { id: m.id as string, name: m.name as string, plan: m.plan as PlanId, subscriptionStatus: (m.subscription_status as string) ?? null, branding: (m.branding as Branding) ?? null },
       role: m.role as Role,
     };
     // Sliding expiry: extend sessions that are more than halfway through.
@@ -371,6 +378,19 @@ authRouter.post("/workspaces", requireAuth, wrap(async (req) => {
 authRouter.patch("/workspace", requireRole("admin"), wrap(async (req) => {
   await db().query(`UPDATE workspaces SET name=$2 WHERE id=$1`, [req.auth!.workspace.id, String(req.body?.name ?? "").trim().slice(0, 80) || req.auth!.workspace.name]);
   return { ok: true };
+}));
+
+/** White-label branding for share links, reports and exports. */
+authRouter.put("/workspace/branding", requireRole("admin"), wrap(async (req) => {
+  const b = req.body ?? {};
+  const color = /^#[0-9a-f]{6}$/i.test(String(b.color ?? "")) ? String(b.color) : undefined;
+  const logo = typeof b.logo === "string" && /^data:image\/(png|jpeg|svg\+xml|webp);base64,/.test(b.logo) && b.logo.length < 300_000 ? b.logo : undefined;
+  if (b.logo && !logo) throw new HttpError(400, "Logo must be a PNG, JPG, SVG or WebP under 200 KB.");
+  const canHide = effectivePlan(req.auth!.workspace.plan).id !== "free";
+  const branding: Branding = { name: String(b.name ?? "").trim().slice(0, 60) || undefined, color, logo, hidePoweredBy: canHide && !!b.hidePoweredBy };
+  await db().query(`UPDATE workspaces SET branding=$2 WHERE id=$1`, [req.auth!.workspace.id, JSON.stringify(branding)]);
+  await audit(req, "workspace.branding_updated");
+  return branding;
 }));
 
 authRouter.delete("/workspace", requireRole("owner"), wrap(async (req) => {

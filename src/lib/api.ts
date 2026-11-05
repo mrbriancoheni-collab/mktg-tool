@@ -33,12 +33,19 @@ export interface IntegrationInfo {
 
 export interface Me {
   user: { id: string; email: string; name: string };
-  workspace: { id: string; name: string; plan: PlanId; subscriptionStatus: string | null };
+  workspace: { id: string; name: string; plan: PlanId; subscriptionStatus: string | null; branding: Branding | null };
   role: Role;
   workspaces: { id: string; name: string; role: Role }[];
   billingEnabled: boolean;
   usage: { ai: number; aiLimit: number | null; boards: number; boardLimit: number | null; members: number; memberLimit: number | null };
   features: { scheduledReports: boolean; liveConnectors: boolean };
+}
+
+export interface Branding {
+  name?: string;
+  color?: string;
+  logo?: string;
+  hidePoweredBy?: boolean;
 }
 
 export interface Member {
@@ -104,6 +111,7 @@ export const api = {
   deleteAccount: (password: string) => json("/api/account", { password }, "DELETE"),
   createWorkspace: (name: string) => json<{ id: string }>("/api/workspaces", { name }),
   renameWorkspace: (name: string) => json("/api/workspace", { name }, "PATCH"),
+  setBranding: (b: Branding) => json<Branding>("/api/workspace/branding", b, "PUT"),
   deleteWorkspace: (confirm: string) => json("/api/workspace", { confirm }, "DELETE"),
   members: () => json<{ members: Member[]; invites: { id: string; email: string; role: Role; expires_at: string }[] }>("/api/workspace/members"),
   setRole: (userId: string, role: Role) => json(`/api/workspace/members/${userId}`, { role }, "PATCH"),
@@ -156,7 +164,7 @@ export const api = {
   deleteBoard: (id: string) => json(`/api/boards/${id}`, undefined, "DELETE"),
   duplicateBoard: (id: string) => json<BoardRecord>(`/api/boards/${id}/duplicate`, {}),
   share: (id: string, enabled: boolean) => json<{ shareToken: string | null }>(`/api/boards/${id}/share`, { enabled }),
-  shared: (token: string) => json<BoardRecord>(`/api/shared/${token}`),
+  shared: (token: string) => json<BoardRecord & { branding: Branding | null }>(`/api/shared/${token}`),
   comments: (id: string) => json<Comment[]>(`/api/boards/${id}/comments`),
   addComment: (target: { boardId?: string | null; shareToken?: string | null }, c: { nodeId: string | null; author: string; text: string }) =>
     json<Comment>(target.shareToken ? `/api/shared/${target.shareToken}/comments` : `/api/boards/${target.boardId}/comments`, c),

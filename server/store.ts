@@ -96,10 +96,10 @@ export async function getBoardInternal(id: string): Promise<Board | null> {
   return r ? toBoard(r, await comments(id)) : null;
 }
 
-export async function getByShareToken(token: string): Promise<Board | null> {
+export async function getByShareToken(token: string): Promise<(Board & { branding: unknown }) | null> {
   if (!token || token.length < 16) return null;
-  const [r] = await db().query(`SELECT * FROM boards WHERE share_token = $1`, [token]);
-  return r ? toBoard(r, await comments(r.id as string)) : null;
+  const [r] = await db().query(`SELECT b.*, w.branding AS ws_branding FROM boards b JOIN workspaces w ON w.id = b.workspace_id WHERE b.share_token = $1`, [token]);
+  return r ? { ...toBoard(r, await comments(r.id as string)), branding: r.ws_branding ?? null } : null;
 }
 
 export async function createBoard(ws: string, userId: string | null, p: Partial<Pick<Board, "name" | "goal" | "summary" | "graph" | "analysis">> = {}) {

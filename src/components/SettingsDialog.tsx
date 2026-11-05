@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, CreditCard, History, Plug, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
 import { IntegrationsHub } from "./Integrations";
 import { PLANS, PUBLIC_PLANS, roleAtLeast, type Role } from "../../shared/plans";
-import { api, type Member, type Me } from "../lib/api";
+import { api, type Branding, type Member, type Me } from "../lib/api";
 import { confirmDialog } from "./Confirm";
 import { track } from "../lib/track";
 
@@ -353,6 +353,58 @@ function BillingTab({ me, owner }: { me: Me; owner: boolean }) {
   );
 }
 
+function BrandingSection({ me, onChanged }: { me: Me; onChanged: () => void }) {
+  const [b, setB] = useState<Branding>(me.workspace.branding ?? {});
+  const { run, view } = useMsg();
+  const paid = me.workspace.plan !== "free";
+  const onFile = (f?: File) => {
+    if (!f) return;
+    if (f.size > 200_000) return void alertSize();
+    const r = new FileReader();
+    r.onload = () => setB({ ...b, logo: String(r.result) });
+    r.readAsDataURL(f);
+  };
+  const alertSize = () => run(async () => Promise.reject(new Error("Logo must be under 200 KB.")), "");
+  return (
+    <section>
+      <h4>Branding (white-label)</h4>
+      <p className="muted small">Used on share links, client reports and presentations — great for agencies presenting to clients.</p>
+      <div className="branding-grid">
+        <label className="field">
+          <span>Display name</span>
+          <input value={b.name ?? ""} placeholder={me.workspace.name} onChange={(e) => setB({ ...b, name: e.target.value })} />
+        </label>
+        <label className="field">
+          <span>Brand color</span>
+          <div className="row">
+            <input type="color" value={b.color ?? "#6d5efc"} onChange={(e) => setB({ ...b, color: e.target.value })} />
+            <code>{b.color ?? "#6d5efc"}</code>
+          </div>
+        </label>
+        <label className="field">
+          <span>Logo (PNG, JPG, SVG, WebP · under 200 KB)</span>
+          <div className="row">
+            {b.logo && <img src={b.logo} alt="Logo preview" className="logo-preview" />}
+            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={(e) => onFile(e.target.files?.[0])} />
+            {b.logo && (
+              <button className="link small" onClick={() => setB({ ...b, logo: undefined })}>
+                Remove
+              </button>
+            )}
+          </div>
+        </label>
+        <label className="check small">
+          <input type="checkbox" disabled={!paid} checked={!!b.hidePoweredBy} onChange={(e) => setB({ ...b, hidePoweredBy: e.target.checked })} /> Hide “Made with AdCanvas” {paid ? "" : "(Pro and Team plans)"}
+        </label>
+      </div>
+      <button className="btn" onClick={() => run(async () => (await api.setBranding(b), onChanged()), "Branding saved.")}>
+        Save branding
+      </button>
+      {view}
+    </section>
+  );
+}
+
 function WorkspaceTab({ me, owner, onChanged }: { me: Me; owner: boolean; onChanged: () => void }) {
   const [name, setName] = useState(me.workspace.name);
   const [newName, setNewName] = useState("");
@@ -369,6 +421,7 @@ function WorkspaceTab({ me, owner, onChanged }: { me: Me; owner: boolean; onChan
           </button>
         </div>
       </section>
+      <BrandingSection me={me} onChanged={onChanged} />
       <section>
         <h4>Create another workspace</h4>
         <p className="muted small">Useful for agencies: one workspace per client, each with its own members, boards, integrations and billing.</p>

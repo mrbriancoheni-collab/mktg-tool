@@ -63,6 +63,8 @@ interface Snapshot {
 
 interface State {
   me: Me | null;
+  /** Branding of the board's workspace when viewing a share link. */
+  shareBranding: { name?: string; color?: string; logo?: string; hidePoweredBy?: boolean } | null;
   boardId: string | null;
   version: number;
   readOnly: boolean;
@@ -84,7 +86,7 @@ interface State {
   future: Snapshot[];
 
   loadBoard(b: BoardRecord, opts?: { readOnly?: boolean; shareToken?: string | null }): void;
-  setSync(patch: Partial<Pick<State, "saveState" | "version" | "others" | "comments" | "commentFilter" | "me">>): void;
+  setSync(patch: Partial<Pick<State, "saveState" | "version" | "others" | "comments" | "commentFilter" | "me" | "shareBranding">>): void;
   /** Applies edits made by someone else, preserving local selection. */
   applyRemoteOps(ops: Op[]): void;
   setName(name: string): void;
@@ -120,6 +122,7 @@ interface State {
 
 export const useStore = create<State>()((set, get) => ({
       me: null,
+      shareBranding: null,
       boardId: null,
       version: 0,
       readOnly: false,

@@ -15,7 +15,10 @@ import {
   Cloud,
   CloudOff,
   Download,
+  FileJson,
+  FileText,
   Hand,
+  Presentation,
   LineChart as LineChartIcon,
   MousePointer2,
   Plus,
@@ -53,6 +56,7 @@ import { useBoardSync } from "./lib/sync";
 import { SettingsDialog, type SettingsTab } from "./components/SettingsDialog";
 import { AutoMatchDialog } from "./components/Integrations";
 import { Dashboard } from "./components/Dashboard";
+import { exportDeck } from "./lib/exports";
 import { ConfirmHost } from "./components/Confirm";
 import { Checklist, Tour } from "./components/Onboarding";
 import { track } from "./lib/track";
@@ -85,6 +89,41 @@ function Presence() {
         </span>
       ))}
       {others.length > 4 && <span className="avatar more">+{others.length - 4}</span>}
+    </div>
+  );
+}
+
+function ExportMenu({ onJson, onReport, onDeck }: { onJson: () => void; onReport: () => void; onDeck: () => void }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !(e.target as HTMLElement).closest(".export-menu") && setOpen(false);
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+  const pick = (fn: () => void) => () => {
+    setOpen(false);
+    fn();
+  };
+  return (
+    <div className="export-menu board-menu">
+      <button className="icon-btn" title="Export & share deliverables" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Download size={16} />
+      </button>
+      {open && (
+        <div className="dropdown right">
+          <div className="dropdown-label">Export</div>
+          <button className="menu-item" onClick={pick(onReport)}>
+            <FileText size={15} /> Client report (PDF)
+          </button>
+          <button className="menu-item" onClick={pick(onDeck)}>
+            <Presentation size={15} /> Presentation (PowerPoint)
+          </button>
+          <button className="menu-item" onClick={pick(onJson)}>
+            <FileJson size={15} /> Campaign file (JSON)
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -296,11 +335,19 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
 
   return (
     <SimContext.Provider value={sim}>
-      <div className={`app ${ro ? "read-only" : ""}`}>
+      <div className={`app ${ro ? "read-only" : ""}`} style={s.shareToken && s.shareBranding?.color ? ({ "--brand": s.shareBranding.color } as React.CSSProperties) : undefined}>
         <header className="topbar">
-          <a className="brand" href="/">
-            <span className="logo">◆</span> AdCanvas
-          </a>
+          {s.shareToken && s.shareBranding?.logo ? (
+            <span className="brand client-brand">
+              <img src={s.shareBranding.logo} alt="" /> {s.shareBranding.name}
+            </span>
+          ) : s.shareToken && s.shareBranding?.name ? (
+            <span className="brand">{s.shareBranding.name}</span>
+          ) : (
+            <a className="brand" href="/">
+              <span className="logo">◆</span> AdCanvas
+            </a>
+          )}
           {!s.shareToken && <BoardMenu onDialog={setDialog} onError={flash} onSettings={setSettings} />}
           <input className="title-input" value={s.name} readOnly={ro} onChange={(e) => s.setName(e.target.value)} aria-label="Campaign name" />
           <div className="seg" role="tablist">
@@ -317,6 +364,11 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
           {!ro && <SaveStatus />}
           <div className="spacer" />
           <Presence />
+          {ro && s.shareToken && (
+            <a className="btn" href={`/report?share=${s.shareToken}`} target="_blank" rel="noreferrer">
+              <FileText size={15} /> Report
+            </a>
+          )}
           {ro ? (
             <span className="ro-badge">
               <Eye size={14} /> {s.shareToken ? "View only · comments on" : "Viewer access"}
@@ -343,13 +395,19 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               >
                 <FileUp size={15} /> CSV
               </button>
-              <button
-                className="icon-btn"
-                title="Export campaign JSON"
-                onClick={() => download(`${s.name.replace(/\W+/g, "-").toLowerCase() || "campaign"}.adcanvas.json`, JSON.stringify({ ...graph, summary: s.summary }, null, 2))}
-              >
-                <Download size={16} />
-              </button>
+              <ExportMenu
+                onJson={() => download(`${s.name.replace(/\W+/g, "-").toLowerCase() || "campaign"}.adcanvas.json`, JSON.stringify({ ...graph, summary: s.summary }, null, 2))}
+                onReport={() => window.open(`/report?board=${s.boardId}`, "_blank")}
+                onDeck={async () => {
+                  flash("Building your presentation…");
+                  try {
+                    await exportDeck({ graph, name: s.name, summary: s.summary, analysis: s.analysis, branding: s.me?.workspace.branding ?? null, workspaceName: s.me?.workspace.name ?? "" });
+                    track("exported", { kind: "pptx" });
+                  } catch (e) {
+                    flash(`Export failed: ${(e as Error).message}`);
+                  }
+                }}
+              />
               <button className="icon-btn" title="Import campaign JSON into this board" onClick={() => jsonInput.current?.click()}>
                 <Upload size={16} />
               </button>
