@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { BellRing, ChevronDown, Copy, FilePlus2, LayoutDashboard, Link2, ShieldCheck, Trash2 } from "lucide-react";
+import { BellRing, Building2, ChevronDown, Copy, CreditCard, FilePlus2, LayoutDashboard, Link2, Settings, ShieldCheck, Trash2, Users } from "lucide-react";
+import { roleAtLeast } from "../../shared/plans";
 import { api, type BoardSummary } from "../lib/api";
 import { useStore } from "../lib/store";
 import { newBoard, openBoard, saveNow } from "../lib/sync";
@@ -14,10 +15,13 @@ const ago = (t: number) => {
   return new Date(t).toLocaleDateString();
 };
 
-export function BoardMenu({ onDialog, onError }: { onDialog: (d: Dialog) => void; onError: (m: string) => void }) {
+export function BoardMenu({ onDialog, onError, onSettings }: { onDialog: (d: Dialog) => void; onError: (m: string) => void; onSettings: (t: "account" | "members" | "billing") => void }) {
   const [open, setOpen] = useState(false);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const boardId = useStore((s) => s.boardId);
+  const me = useStore((s) => s.me);
+  const canEdit = !!me && roleAtLeast(me.role, "member");
+  const isAdmin = !!me && roleAtLeast(me.role, "admin");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,23 +62,48 @@ export function BoardMenu({ onDialog, onError }: { onDialog: (d: Dialog) => void
             ))}
           </div>
           <hr />
-          <button className="menu-item" onClick={run(() => newBoard())}>
+          {canEdit && <button className="menu-item" onClick={run(() => newBoard())}>
             <FilePlus2 size={15} /> New board
-          </button>
-          <button className="menu-item" onClick={run(async () => boardId && openBoard((await api.duplicateBoard(boardId)).id))}>
+          </button>}
+          {canEdit && <button className="menu-item" onClick={run(async () => boardId && openBoard((await api.duplicateBoard(boardId)).id))}>
             <Copy size={15} /> Duplicate this board
-          </button>
-          <button className="menu-item" onClick={() => (setOpen(false), onDialog("share"))}>
+          </button>}
+          {canEdit && <button className="menu-item" onClick={() => (setOpen(false), onDialog("share"))}>
             <Link2 size={15} /> Share…
-          </button>
-          <button className="menu-item" onClick={() => (setOpen(false), onDialog("reports"))}>
+          </button>}
+          {canEdit && <button className="menu-item" onClick={() => (setOpen(false), onDialog("reports"))}>
             <BellRing size={15} /> Reports & alerts…
-          </button>
-          <button className="menu-item" onClick={() => (setOpen(false), onDialog("privacy"))}>
+          </button>}
+          {isAdmin && <button className="menu-item" onClick={() => (setOpen(false), onDialog("privacy"))}>
             <ShieldCheck size={15} /> Privacy & data…
-          </button>
+          </button>}
           <hr />
-          <button
+          <div className="dropdown-label">Workspace</div>
+          {me?.workspaces.map((w) => (
+            <button
+              key={w.id}
+              className={`menu-item ${w.id === me.workspace.id ? "current" : ""}`}
+              onClick={run(async () => {
+                if (w.id === me.workspace.id) return;
+                await api.switchWorkspace(w.id);
+                localStorage.removeItem("adcanvas-current-board");
+                location.href = "/";
+              })}
+            >
+              <Building2 size={15} /> {w.name} <span className="muted small">{w.role}</span>
+            </button>
+          ))}
+          <button className="menu-item" onClick={() => (setOpen(false), onSettings("members"))}>
+            <Users size={15} /> Members & invites
+          </button>
+          <button className="menu-item" onClick={() => (setOpen(false), onSettings("billing"))}>
+            <CreditCard size={15} /> Plan & usage
+          </button>
+          <button className="menu-item" onClick={() => (setOpen(false), onSettings("account"))}>
+            <Settings size={15} /> Settings
+          </button>
+          {canEdit && <hr />}
+          {canEdit && <button
             className="menu-item danger"
             onClick={run(async () => {
               if (!boardId || !confirm("Delete this board permanently? This can't be undone.")) return;
@@ -85,7 +114,7 @@ export function BoardMenu({ onDialog, onError }: { onDialog: (d: Dialog) => void
             })}
           >
             <Trash2 size={15} /> Delete board
-          </button>
+          </button>}
         </div>
       )}
     </div>

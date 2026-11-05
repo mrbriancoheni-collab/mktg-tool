@@ -6,6 +6,7 @@ export default defineConfig({
   build: { chunkSizeWarningLimit: 800 },
   server: {
     port: 5173,
-    proxy: { "/api": "http://localhost:8787" },
+    // Keep the browser-facing Host so links the API generates point at the app.
+    proxy: { "/api": { target: "http://localhost:8787", changeOrigin: false } },
   },
 });
