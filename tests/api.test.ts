@@ -235,9 +235,10 @@ describe("workspaces & boards", () => {
 describe("security primitives", () => {
   test("rate limiter blocks bursts", async () => {
     const { rateLimit } = await import("../server/auth");
-    const mw = rateLimit("t", 3, 60_000);
+    const mw = rateLimit(`t${Date.now()}`, 3, 60_000);
     const results: unknown[] = [];
-    for (let i = 0; i < 5; i++) mw({ ip: "1.2.3.4" } as never, {} as never, (e?: unknown) => results.push(e));
+    // Works for both the in-memory limiter (sync) and the Postgres-backed one (async).
+    for (let i = 0; i < 5; i++) results.push(await new Promise((r) => mw({ ip: "1.2.3.4" } as never, {} as never, (e?: unknown) => r(e))));
     assert.equal(results.filter((e) => e === undefined).length, 3);
     assert.equal((results[4] as { status: number }).status, 429);
   });
@@ -265,6 +266,96 @@ describe("security primitives", () => {
     assert.equal((await a.post("/api/integrations/hubspot/connect", { token: "pat-na1-supersecret" })).status, 200);
     const [row] = await db().query(`SELECT credentials_enc FROM connections WHERE type='hubspot'`);
     assert.ok(!String(row.credentials_enc).includes("supersecret"));
+  });
+});
+
+describe("experiments, versions, notifications", () => {
+  test("experiment lifecycle and workspace isolation", async () => {
+    const a = client(), b = client();
+    await signup(a, "exp-a@test.co");
+    await signup(b, "exp-b@test.co");
+    const board = (await a.post("/api/boards", { name: "E" })).data;
+    const e = (await a.post(`/api/boards/${board.id}/experiments`, { hypothesis: "Shorter form lifts conversion" })).data;
+    assert.equal(e.variants.length, 2);
+    const u = (await a.patch(`/api/boards/${board.id}/experiments/${e.id}`, { status: "running", variants: [{ name: "A", visitors: 100, conversions: 5 }, { name: "B", visitors: 100, conversions: 9 }] })).data;
+    assert.equal(u.status, "running");
+    assert.ok(u.startedAt);
+    assert.equal((await b.get(`/api/boards/${board.id}/experiments`)).status, 404);
+  });
+
+  test("versions: save, list, fetch snapshot", async () => {
+    const a = client();
+    await signup(a, "ver@test.co");
+    const board = (await a.post("/api/boards", { name: "V1" })).data;
+    await a.post(`/api/boards/${board.id}/versions`, { label: "Sent to client" });
+    await a.post(`/api/boards/${board.id}/ops`, { ops: [{ t: "meta", patch: { name: "V2" } }] });
+    const list = (await a.get(`/api/boards/${board.id}/versions`)).data;
+    const saved = list.find((v: { label: string }) => v.label === "Sent to client");
+    assert.ok(saved);
+    assert.equal((await a.get(`/api/boards/${board.id}/versions/${saved.id}`)).data.name, "V1");
+  });
+
+  test("@mentions notify teammates", async () => {
+    const owner = client();
+    await signup(owner, "mention-owner@test.co", { name: "Olive Owner" });
+    const inv = await owner.post("/api/workspace/invites", { email: "tess.mate@test.co", role: "member" });
+    const t = client();
+    await signup(t, "tess.mate@test.co", { name: "Tess Mate", invite: inv.data.url.split("/invite/")[1] });
+    const board = (await owner.post("/api/boards", { name: "M" })).data;
+    await owner.post(`/api/boards/${board.id}/comments`, { text: "@tess can you check the budget?" });
+    const n = (await t.get("/api/notifications")).data;
+    assert.equal(n.unread, 1);
+    assert.match(n.items[0].title, /mentioned you/);
+    await t.post("/api/notifications/read", {});
+    assert.equal((await t.get("/api/notifications")).data.unread, 0);
+  });
+});
+
+describe("two-factor authentication", () => {
+  test("enable TOTP, sign in with a code, use a recovery code once", async () => {
+    const { totp } = await import("../server/totp");
+    const a = client();
+    await signup(a, "mfa@test.co");
+    const { secret } = (await a.post("/api/account/mfa/setup", {})).data;
+    assert.equal((await a.post("/api/account/mfa/enable", { code: "000000" })).status, 400);
+    const { recoveryCodes } = (await a.post("/api/account/mfa/enable", { code: totp(secret) })).data;
+    assert.equal(recoveryCodes.length, 10);
+    assert.equal((await a.get("/api/auth/me")).data.user.mfaEnabled, true);
+
+    const b = client();
+    const login = await b.post("/api/auth/login", { email: "mfa@test.co", password: "correct horse battery" });
+    assert.equal(login.data.mfaRequired, true);
+    assert.equal((await b.get("/api/auth/me")).status, 401, "pending session can't access the app");
+    assert.equal((await b.get("/api/boards")).status, 401);
+    assert.equal((await b.post("/api/auth/mfa", { code: "123456" })).status, 401);
+    assert.equal((await b.post("/api/auth/mfa", { code: totp(secret) })).status, 200);
+    assert.equal((await b.get("/api/auth/me")).status, 200);
+
+    const c = client();
+    await c.post("/api/auth/login", { email: "mfa@test.co", password: "correct horse battery" });
+    assert.equal((await c.post("/api/auth/mfa", { code: recoveryCodes[0] })).status, 200);
+    const d = client();
+    await d.post("/api/auth/login", { email: "mfa@test.co", password: "correct horse battery" });
+    assert.equal((await d.post("/api/auth/mfa", { code: recoveryCodes[0] })).status, 401, "recovery codes are single-use");
+  });
+});
+
+describe("product analytics", () => {
+  test("events are recorded and the admin funnel is restricted", async () => {
+    const a = client();
+    await signup(a, "analytics-admin@test.co");
+    await a.post("/api/events", { events: [{ event: "board_built" }, { event: "bad event name!" }] });
+    assert.equal((await a.get("/api/admin/metrics")).status, 403);
+    process.env.ADMIN_EMAILS = "analytics-admin@test.co";
+    try {
+      const m = (await a.get("/api/admin/metrics?days=30")).data;
+      const step = (k: string) => m.steps.find((s: { step: string }) => s.step === k).users;
+      assert.ok(step("signup") >= 1 && step("board_built") >= 1);
+    } finally {
+      delete process.env.ADMIN_EMAILS;
+    }
+    const [bad] = await db().query(`SELECT count(*)::int AS n FROM events WHERE event LIKE 'bad%'`);
+    assert.equal(Number(bad.n), 0, "invalid event names are dropped");
   });
 });
 

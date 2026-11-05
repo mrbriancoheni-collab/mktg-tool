@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, CreditCard, History, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, Copy, CreditCard, History, Plug, Settings, ShieldCheck, Trash2, UserPlus, Users, X } from "lucide-react";
+import { IntegrationsHub } from "./Integrations";
 import { PLANS, PUBLIC_PLANS, roleAtLeast, type Role } from "../../shared/plans";
-import { api, type Member, type Me } from "../lib/api";
+import { api, type Branding, type Member, type Me } from "../lib/api";
+import { confirmDialog } from "./Confirm";
+import { track } from "../lib/track";
 
-type Tab = "account" | "members" | "billing" | "workspace" | "audit";
+export type SettingsTab = "account" | "members" | "integrations" | "billing" | "workspace" | "audit";
+type Tab = SettingsTab;
 
 export function SettingsDialog({ me, initialTab = "account", onClose, onChanged }: { me: Me; initialTab?: Tab; onClose: () => void; onChanged: () => void }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -12,6 +16,7 @@ export function SettingsDialog({ me, initialTab = "account", onClose, onChanged 
   const tabs: [Tab, string, React.ReactNode, boolean][] = [
     ["account", "Account", <Settings size={14} />, true],
     ["members", "Members", <Users size={14} />, true],
+    ["integrations", "Integrations", <Plug size={14} />, true],
     ["billing", "Plan & usage", <CreditCard size={14} />, true],
     ["workspace", "Workspace", <Settings size={14} />, admin],
     ["audit", "Audit log", <History size={14} />, admin],
@@ -38,6 +43,7 @@ export function SettingsDialog({ me, initialTab = "account", onClose, onChanged 
           <div className="settings-panel">
             {tab === "account" && <AccountTab me={me} onChanged={onChanged} />}
             {tab === "members" && <MembersTab me={me} admin={admin} owner={owner} onChanged={onChanged} />}
+            {tab === "integrations" && <IntegrationsHub me={me} />}
             {tab === "billing" && <BillingTab me={me} owner={owner} />}
             {tab === "workspace" && <WorkspaceTab me={me} owner={owner} onChanged={onChanged} />}
             {tab === "audit" && <AuditTab />}
@@ -63,6 +69,82 @@ function useMsg() {
   return { run, view };
 }
 
+function SecuritySection({ me, onChanged }: { me: Me; onChanged: () => void }) {
+  const [setup, setSetup] = useState<{ secret: string; qr: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [disablePw, setDisablePw] = useState("");
+  const { run, view } = useMsg();
+  const on = !!me.user.mfaEnabled;
+  return (
+    <section>
+      <h4>
+        <ShieldCheck size={14} /> Two-step verification {on ? <span className="pill ok-pill">On</span> : <span className="pill muted-pill">Off</span>}
+      </h4>
+      {codes ? (
+        <div className="note small">
+          <b>Save your recovery codes.</b> Each works once if you lose your phone. They won't be shown again.
+          <pre className="codes">{codes.join("\n")}</pre>
+          <div className="row">
+            <button className="btn" onClick={() => navigator.clipboard.writeText(codes.join("\n"))}>
+              <Copy size={14} /> Copy
+            </button>
+            <button className="btn primary" onClick={() => (setCodes(null), onChanged())}>
+              I've saved them
+            </button>
+          </div>
+        </div>
+      ) : on ? (
+        <>
+          <p className="muted small">You'll enter a code from your authenticator app each time you sign in with a password.</p>
+          <div className="row">
+            <input type="password" placeholder={me.user.hasPassword ? "Password or current code" : "Current code"} value={disablePw} onChange={(e) => setDisablePw(e.target.value)} />
+            <button
+              className="btn"
+              disabled={!disablePw}
+              onClick={() => run(async () => (await api.mfaDisable(/^\d{6}$/.test(disablePw) ? { code: disablePw } : { password: disablePw }), onChanged()), "Two-step verification turned off.")}
+            >
+              Turn off
+            </button>
+          </div>
+        </>
+      ) : setup ? (
+        <div className="mfa-setup">
+          <img src={setup.qr} alt="QR code for your authenticator app" width={160} height={160} />
+          <div>
+            <p className="small">1. Scan this with Google Authenticator, 1Password, Authy or similar.</p>
+            <p className="small muted">Can't scan? Enter this key: <code>{setup.secret.replace(/(.{4})/g, "$1 ").trim()}</code></p>
+            <p className="small">2. Enter the 6-digit code it shows:</p>
+            <div className="row">
+              <input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value)} />
+              <button className="btn primary" disabled={code.length < 6} onClick={() => run(async () => setCodes((await api.mfaEnable(code)).recoveryCodes), "Two-step verification is on.")}>
+                Turn on
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="muted small">Protect your account with a code from your phone in addition to your password.</p>
+          <button
+            className="btn"
+            onClick={() =>
+              run(async () => {
+                const s = await api.mfaSetup();
+                const QR = await import("qrcode");
+                setSetup({ secret: s.secret, qr: await QR.toDataURL(s.otpauth, { margin: 1, width: 320 }) });
+              }, "")
+            }
+          >
+            Set up two-step verification
+          </button>
+        </>
+      )}
+      {view}
+    </section>
+  );
+}
+
 function AccountTab({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const [name, setName] = useState(me.user.name);
   const [pw, setPw] = useState({ current: "", next: "" });
@@ -86,6 +168,7 @@ function AccountTab({ me, onChanged }: { me: Me; onChanged: () => void }) {
           </button>
         </div>
       </section>
+      <SecuritySection me={me} onChanged={onChanged} />
       <section>
         <h4>Change password</h4>
         <div className="grid2">
@@ -117,11 +200,13 @@ function AccountTab({ me, onChanged }: { me: Me; onChanged: () => void }) {
             className="btn danger"
             disabled={!delPw}
             onClick={() =>
-              confirm("Permanently delete your account? This cannot be undone.") &&
+              confirmDialog("Delete your account?", { message: "This cannot be undone. Workspaces where you're the only owner are deleted too.", confirmLabel: "Delete account", danger: true }).then(
+                (ok) =>
+                  void (ok &&
               run(async () => {
                 await api.deleteAccount(delPw);
                 location.href = "/";
-              }, "Deleted.")
+              }, "Deleted.")))
             }
           >
             <Trash2 size={14} /> Delete account
@@ -172,6 +257,7 @@ function MembersTab({ me, admin, owner, onChanged }: { me: Me; admin: boolean; o
               onClick={() =>
                 run(async () => {
                   const r = await api.invite(email, role);
+                  track("shared", { via: "invite" });
                   setLink(r.url);
                   setEmail("");
                   await load();
@@ -224,13 +310,13 @@ function MembersTab({ me, admin, owner, onChanged }: { me: Me; admin: boolean; o
                 </td>
                 <td className="right">
                   {m.id === me.user.id ? (
-                    <button className="btn" onClick={() => confirm("Leave this workspace?") && run(async () => (await api.removeMember(m.id), (location.href = "/")), "Left.")}>
+                    <button className="btn" onClick={async () => (await confirmDialog("Leave this workspace?", { confirmLabel: "Leave", danger: true })) && run(async () => (await api.removeMember(m.id), (location.href = "/")), "Left.")}>
                       Leave
                     </button>
                   ) : (
                     admin &&
                     (m.role !== "owner" || owner) && (
-                      <button className="icon-btn danger" title="Remove" onClick={() => confirm(`Remove ${m.email}?`) && run(async () => (await api.removeMember(m.id), await load(), onChanged()), "Removed.")}>
+                      <button className="icon-btn danger" title="Remove" onClick={async () => (await confirmDialog(`Remove ${m.email}?`, { message: "They lose access to every board in this workspace.", confirmLabel: "Remove", danger: true })) && run(async () => (await api.removeMember(m.id), await load(), onChanged()), "Removed.")}>
                         <Trash2 size={14} />
                       </button>
                     )
@@ -344,6 +430,58 @@ function BillingTab({ me, owner }: { me: Me; owner: boolean }) {
   );
 }
 
+function BrandingSection({ me, onChanged }: { me: Me; onChanged: () => void }) {
+  const [b, setB] = useState<Branding>(me.workspace.branding ?? {});
+  const { run, view } = useMsg();
+  const paid = me.workspace.plan !== "free";
+  const onFile = (f?: File) => {
+    if (!f) return;
+    if (f.size > 200_000) return void alertSize();
+    const r = new FileReader();
+    r.onload = () => setB({ ...b, logo: String(r.result) });
+    r.readAsDataURL(f);
+  };
+  const alertSize = () => run(async () => Promise.reject(new Error("Logo must be under 200 KB.")), "");
+  return (
+    <section>
+      <h4>Branding (white-label)</h4>
+      <p className="muted small">Used on share links, client reports and presentations — great for agencies presenting to clients.</p>
+      <div className="branding-grid">
+        <label className="field">
+          <span>Display name</span>
+          <input value={b.name ?? ""} placeholder={me.workspace.name} onChange={(e) => setB({ ...b, name: e.target.value })} />
+        </label>
+        <label className="field">
+          <span>Brand color</span>
+          <div className="row">
+            <input type="color" value={b.color ?? "#6d5efc"} onChange={(e) => setB({ ...b, color: e.target.value })} />
+            <code>{b.color ?? "#6d5efc"}</code>
+          </div>
+        </label>
+        <label className="field">
+          <span>Logo (PNG, JPG, SVG, WebP · under 200 KB)</span>
+          <div className="row">
+            {b.logo && <img src={b.logo} alt="Logo preview" className="logo-preview" />}
+            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={(e) => onFile(e.target.files?.[0])} />
+            {b.logo && (
+              <button className="link small" onClick={() => setB({ ...b, logo: undefined })}>
+                Remove
+              </button>
+            )}
+          </div>
+        </label>
+        <label className="check small">
+          <input type="checkbox" disabled={!paid} checked={!!b.hidePoweredBy} onChange={(e) => setB({ ...b, hidePoweredBy: e.target.checked })} /> Hide “Made with AdCanvas” {paid ? "" : "(Pro and Team plans)"}
+        </label>
+      </div>
+      <button className="btn" onClick={() => run(async () => (await api.setBranding(b), onChanged()), "Branding saved.")}>
+        Save branding
+      </button>
+      {view}
+    </section>
+  );
+}
+
 function WorkspaceTab({ me, owner, onChanged }: { me: Me; owner: boolean; onChanged: () => void }) {
   const [name, setName] = useState(me.workspace.name);
   const [newName, setNewName] = useState("");
@@ -360,6 +498,7 @@ function WorkspaceTab({ me, owner, onChanged }: { me: Me; owner: boolean; onChan
           </button>
         </div>
       </section>
+      <BrandingSection me={me} onChanged={onChanged} />
       <section>
         <h4>Create another workspace</h4>
         <p className="muted small">Useful for agencies: one workspace per client, each with its own members, boards, integrations and billing.</p>

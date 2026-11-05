@@ -7,12 +7,12 @@ import { ASSET_LABELS, CATALOG, CATALOG_BY_TYPE, type AssetKind } from "../share
 import type { Graph, GraphNode, SimulationResult } from "../shared/model";
 import { simulate } from "../shared/simulate";
 import { AD_SPECS, formatFor, type AdPack } from "../shared/adpack";
-import { AdPackSchema, AnalysisSchema, PlanSchema, type Analysis, type Plan } from "./schemas";
+import { AdPackSchema, AnalysisSchema, MockupSchema, PlanSchema, type Analysis, type MockupSet, type Plan } from "./schemas";
 import * as demo from "./demo";
 
-const MODEL = process.env.ADCANVAS_MODEL ?? "claude-opus-5-5";
+export const MODEL = process.env.ADCANVAS_MODEL ?? "claude-opus-5-5";
 // Re-run a declined request on Anthropic's recommended fallback model.
-const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
+export const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
 
 function hasCredentials() {
   if (process.env.ADCANVAS_DEMO === "1") return false;
@@ -22,13 +22,13 @@ function hasCredentials() {
 }
 
 export const LIVE = hasCredentials();
-const client = LIVE ? new Anthropic() : null;
+export const client = LIVE ? new Anthropic() : null;
 
 export class AIError extends Error {}
 
 // ── Shared context ────────────────────────────────────────────────
 
-const SYSTEM = `You are AdCanvas, a senior performance-marketing strategist embedded in a visual campaign-planning canvas.
+export const SYSTEM = `You are AdCanvas, a senior performance-marketing strategist embedded in a visual campaign-planning canvas.
 Users map campaigns as flows: traffic sources → pages → actions → revenue, plus integrations (analytics, CRM, payments) attached for tracking.
 Be specific and quantitative. Use realistic industry benchmarks, name the assumption when you use one, and tie advice to node names on the canvas.
 Write for a busy marketer: plain language, no filler, no hype.
@@ -255,6 +255,48 @@ export async function generateAdPack(graph: Graph, nodeId: string, finalUrl: str
     keywords: g.keywords.slice(0, spec.keywords),
   }));
   return pack;
+}
+
+// ── Ad creative mockups (design specs rendered client-side as SVG) ──
+
+const HEX = /^#[0-9a-f]{6}$/i;
+export async function generateMockups(graph: Graph, nodeId: string, brandColor: string | undefined, onUsage?: OnUsage): Promise<MockupSet> {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node) throw new AIError("Node not found");
+  let set: MockupSet;
+  if (!client) set = demo.mockups(graph, node, brandColor);
+  else {
+    const msg = await client.beta.messages.parse({
+      model: MODEL,
+      max_tokens: 16000,
+      ...FALLBACK,
+      output_config: { effort: "medium", format: betaZodOutputFormat(MockupSchema) },
+      system: SYSTEM,
+      messages: [
+        {
+          role: "user",
+          content: `<canvas>\n${describeGraph(graph)}\n</canvas>\n\nDesign 4 distinct static ad creatives for "${node.data.label}" (${node.data.type}), one per layout: bold-type, split-image, testimonial, offer-badge. Each must have a scroll-stopping headline (≤40 chars), a supporting line (≤90 chars), a CTA (≤18 chars), and colors with strong text contrast${brandColor ? ` built around the brand color ${brandColor}` : ""}. Write an imagePrompt describing the photo or visual for the image area. Keep claims truthful and compliant with ad policies.`,
+        },
+      ],
+    });
+    onUsage?.(msg.usage, msg.model);
+    checkRefusal(msg);
+    if (!msg.parsed_output) throw new AIError("Could not parse the mockups. Please try again.");
+    set = msg.parsed_output;
+  }
+  // Enforce limits and safe colors.
+  set.variants = set.variants.slice(0, 4).map((v) => ({
+    ...v,
+    headline: v.headline.slice(0, 48),
+    primary: v.primary.slice(0, 110),
+    cta: v.cta.slice(0, 22),
+    badge: v.badge?.slice(0, 14) ?? null,
+    quote: v.quote?.slice(0, 140) ?? null,
+    bg: HEX.test(v.bg) ? v.bg : "#111827",
+    fg: HEX.test(v.fg) ? v.fg : "#ffffff",
+    accent: HEX.test(v.accent) ? v.accent : brandColor ?? "#6d5efc",
+  }));
+  return set;
 }
 
 // ── 5. Chat with the canvas as context (streamed) ─────────────────

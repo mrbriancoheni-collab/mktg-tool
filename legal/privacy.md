@@ -18,7 +18,8 @@ This Privacy Policy explains how [COMPANY LEGAL NAME] ("**we**", "**us**") colle
 | Account information | Name, email, company, role, password hash or SSO identifier | You |
 | Workspace content | Boards, campaign plans, notes, comments, budgets, uploaded CSVs, AI-generated assets | You and your teammates |
 | Integration data | Advertising metrics (spend, impressions, clicks, conversions, revenue), account and campaign identifiers, and authorization tokens from platforms you connect (e.g. Google Ads, Meta, LinkedIn, HubSpot, Shopify) | Third-party platforms, at your direction |
-| Usage & device data | Pages and features used, IP address, browser type, timestamps, error logs | Automatically |
+| Usage & device data | Pages and features used (first-party product events, such as "built a funnel"), IP address, browser type, timestamps, error logs | Automatically |
+| Sign-in data | If you use "Sign in with Google": your Google account ID, name and verified email address. If you turn on two-step verification: an encrypted authenticator secret and hashed recovery codes. | You / Google |
 | Billing data | Plan, invoices, last four digits of card (full card data is handled by our payment processor) | You and [PAYMENT PROCESSOR] |
 | Communications | Support requests, feedback | You |
 

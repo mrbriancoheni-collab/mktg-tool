@@ -13,9 +13,10 @@ We use the following third parties to process customer personal data on our beha
 | Stripe, Inc. | Subscription billing and payments | Billing contact, payment details (card data handled only by Stripe) | United States |
 | Resend (Plus Five Five, Inc.) | Transactional email (invites, password resets) | Name, email address | United States |
 | Functional Software, Inc. (Sentry) | Error monitoring | Technical logs, limited user identifiers | [United States / EU] |
+| PostHog, Inc. *(only if enabled)* | Product analytics | Pseudonymous user ID, in-app action names | [United States / EU] |
 
 > Template: remove any provider you don't use, and add any you add (e.g. a different host). Keep this page in sync with `docs/security/vendor-management.md`.
 
-**Not subprocessors.** Integrations that you choose to connect, such as Google Ads, Meta, LinkedIn, TikTok, HubSpot, Salesforce, Shopify, Slack, Zapier, Make, or a webhook you configure, receive or send data at your direction under your own agreements with those providers.
+**Not subprocessors.** Integrations that you choose to connect, such as Google Ads, GA4, Meta, LinkedIn, TikTok, HubSpot, Salesforce, Shopify, Slack, Zapier, Make, or a webhook you configure, receive or send data at your direction under your own agreements with those providers.
 
 To receive notice of changes, email [PRIVACY EMAIL].

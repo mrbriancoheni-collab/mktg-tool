@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { CATALOG_BY_TYPE } from "../../shared/catalog";
+import { simulate } from "../../shared/simulate";
 import { Sparkles, X } from "lucide-react";
 import { TEMPLATES, buildTemplate } from "../../shared/templates";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { confirmDialog } from "./Confirm";
+import { track } from "../lib/track";
 
 const EXAMPLES = [
   "Launch a $40 eco-friendly water bottle to US millennials. $15k/month budget, goal: 3x ROAS within 60 days.",
@@ -16,15 +20,27 @@ export function BriefModal({ onClose, onDone }: { onClose: () => void; onDone: (
   const [error, setError] = useState("");
   const loadPlan = useStore((s) => s.loadPlan);
   const hasNodes = useStore((s) => s.nodes.length > 0);
+  const boardId = useStore((s) => s.boardId);
+  const [seg, setSeg] = useState<"all" | "b2b" | "b2c">("all");
+  const [goal, setGoal] = useState("All goals");
+  const goals = ["All goals", ...new Set(TEMPLATES.map((t) => t.goal))];
+  const shown = TEMPLATES.filter((t) => (seg === "all" || t.segment === seg) && (goal === "All goals" || t.goal === goal));
+  const roas = useMemo(() => Object.fromEntries(TEMPLATES.map((t) => [t.id, forecastRoas(t.id)])), []);
+  /** Keep a copy of the current board in version history before replacing it. */
+  const keepCopy = async () => {
+    if (hasNodes && boardId) await api.saveVersion(boardId, "Before replacing with a new plan").catch(() => {});
+  };
 
   const generate = async () => {
     if (!brief.trim()) return;
-    if (hasNodes && !confirm("Replace the current canvas with a new AI-generated campaign? (You can undo.)")) return;
+    if (hasNodes && !(await confirmDialog("Replace this board?", { message: "The AI campaign will replace what's on the canvas. You can undo, and version history keeps a copy.", confirmLabel: "Replace" }))) return;
     setBusy(true);
     setError("");
     try {
+      await keepCopy();
       const plan = await api.plan(brief);
       loadPlan(plan, brief);
+      track("board_built", { via: "ai" });
       onDone(true);
     } catch (e) {
       setError((e as Error).message);
@@ -70,25 +86,57 @@ export function BriefModal({ onClose, onDone }: { onClose: () => void; onDone: (
             {busy ? "Designing your funnel…" : "Generate campaign"}
           </button>
         </footer>
-        <div className="divider">or start from a template</div>
+        <div className="divider">or start from a proven template</div>
+        <div className="row wrap template-filters">
+          <div className="seg seg-sm">
+            {(["all", "b2b", "b2c"] as const).map((x) => (
+              <button key={x} className={seg === x ? "on" : ""} onClick={() => setSeg(x)}>
+                {x === "all" ? "All" : x.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <select value={goal} onChange={(e) => setGoal(e.target.value)} aria-label="Goal">
+            {goals.map((g) => (
+              <option key={g}>{g}</option>
+            ))}
+          </select>
+        </div>
         <div className="templates">
-          {TEMPLATES.map((t) => (
+          {shown.map((t) => (
             <button
               key={t.id}
               className="template"
               disabled={busy}
-              onClick={() => {
-                if (hasNodes && !confirm("Replace the current canvas? (You can undo.)")) return;
+              onClick={async () => {
+                if (hasNodes && !(await confirmDialog("Replace this board?", { message: "The template will replace what's on the canvas. You can undo, and version history keeps a copy.", confirmLabel: "Replace" }))) return;
+                await keepCopy();
                 loadPlan(buildTemplate(t.id));
+                track("board_built", { via: "template", template: t.id });
                 onDone(true);
               }}
             >
               <b>{t.name}</b>
               <span>{t.description}</span>
+              <span className="template-tags">
+                <i>{t.industry}</i>
+                <i>{t.goal}</i>
+                <i className="roas">~{roas[t.id].toFixed(1)}x ROAS</i>
+              </span>
             </button>
           ))}
         </div>
       </div>
     </div>
   );
+}
+
+/** Forecast ROAS for a template at the default $10k budget (shown on cards). */
+function forecastRoas(id: Parameters<typeof buildTemplate>[0]) {
+  const p = buildTemplate(id);
+  const g = {
+    name: p.name,
+    nodes: p.nodes.map((n) => ({ id: n.id, data: { ...Object.fromEntries(Object.entries(n).filter(([, v]) => v !== null)), kind: CATALOG_BY_TYPE[n.type]?.kind ?? "page" } })),
+    edges: p.edges.map((e, i) => ({ id: `e${i}`, source: e.source, target: e.target, data: e.weight ? { weight: e.weight } : {} })),
+  };
+  return simulate(g as never).totals.roas;
 }

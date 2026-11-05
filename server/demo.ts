@@ -151,3 +151,16 @@ export function adPack(graph: Graph, n: GraphNode, format: AdFormat, finalUrl: s
     ],
   };
 }
+
+export function mockups(graph: Graph, n: GraphNode, brand?: string) {
+  const accent = brand ?? "#6d5efc";
+  const product = graph.name.replace(/ (launch|campaign|funnel|pipeline)$/i, "");
+  return {
+    variants: [
+      { layout: "bold-type" as const, headline: "Stop guessing. Start growing.", primary: `${product}: the simpler way to get results — set up in minutes.`, cta: "Try it free", badge: null, quote: null, bg: "#0f172a", fg: "#ffffff", accent, imagePrompt: "Minimal abstract gradient background, soft light" },
+      { layout: "split-image" as const, headline: "Built for busy teams", primary: "Everything in one place. Less admin, more of the work you love.", cta: "Learn more", badge: null, quote: null, bg: "#ffffff", fg: "#111827", accent, imagePrompt: `Lifestyle photo of a person happily using ${product} at a bright desk` },
+      { layout: "testimonial" as const, headline: "Rated 4.8/5 by customers", primary: "Join thousands who switched this year.", cta: "See reviews", badge: null, quote: "“We cut our costs by a third in the first month. Wish we'd found it sooner.”", bg: "#f8fafc", fg: "#0f172a", accent, imagePrompt: "Friendly headshot of a smiling customer, natural light" },
+      { layout: "offer-badge" as const, headline: "Your first month, half price", primary: "Limited-time offer for new customers. Cancel anytime.", cta: "Claim offer", badge: "50% OFF", quote: null, bg: accent, fg: "#ffffff", accent: "#facc15", imagePrompt: `Product shot of ${product} on a clean colored background` },
+    ],
+  };
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -15,6 +15,14 @@ import {
   Cloud,
   CloudOff,
   Download,
+  FileJson,
+  Gauge,
+  FileText,
+  Hand,
+  Presentation,
+  LineChart as LineChartIcon,
+  MousePointer2,
+  Plus,
   Eye,
   FileUp,
   Hammer,
@@ -28,6 +36,7 @@ import {
   Sparkles,
   Undo2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { defaultUtm } from "../shared/adpack";
 import { CATALOG_BY_TYPE } from "../shared/catalog";
@@ -37,7 +46,9 @@ import { BoardMenu, type Dialog } from "./components/BoardMenu";
 import { BriefModal } from "./components/BriefModal";
 import { ChatPanel } from "./components/ChatPanel";
 import { CommentsPanel } from "./components/CommentsPanel";
-import { PrivacyDialog, ReportsDialog, ShareDialog } from "./components/Dialogs";
+import { PrivacyDialog, ReportsDialog, ShareDialog, VersionsDialog } from "./components/Dialogs";
+const OptimizePanel = lazy(() => import("./components/OptimizePanel").then((m) => ({ default: m.OptimizePanel })));
+import { NotificationBell } from "./components/Notifications";
 import { Inspector } from "./components/Inspector";
 import { KpiBar } from "./components/KpiBar";
 import { Palette } from "./components/Palette";
@@ -45,7 +56,14 @@ import { api, type IntegrationInfo } from "./lib/api";
 import { download, parseActualsCSV, parseRevenueCSV } from "./lib/format";
 import { toGraph, useStore, type Panel } from "./lib/store";
 import { useBoardSync } from "./lib/sync";
-import { SettingsDialog } from "./components/SettingsDialog";
+import type { SettingsTab } from "./components/SettingsDialog";
+const SettingsDialog = lazy(() => import("./components/SettingsDialog").then((m) => ({ default: m.SettingsDialog })));
+import { AutoMatchDialog } from "./components/Integrations";
+const Dashboard = lazy(() => import("./components/Dashboard").then((m) => ({ default: m.Dashboard })));
+
+import { ConfirmHost } from "./components/Confirm";
+import { Checklist, Tour } from "./components/Onboarding";
+import { track } from "./lib/track";
 import { FlowEdge } from "./nodes/FlowEdge";
 import { SimContext, StageNode } from "./nodes/StageNode";
 import { StickyNode } from "./nodes/StickyNode";
@@ -79,9 +97,47 @@ function Presence() {
   );
 }
 
+function ExportMenu({ onJson, onReport, onDeck }: { onJson: () => void; onReport: () => void; onDeck: () => void }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !(e.target as HTMLElement).closest(".export-menu") && setOpen(false);
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+  const pick = (fn: () => void) => () => {
+    setOpen(false);
+    fn();
+  };
+  return (
+    <div className="export-menu board-menu">
+      <button className="icon-btn" title="Export & share deliverables" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Download size={16} />
+      </button>
+      {open && (
+        <div className="dropdown right">
+          <div className="dropdown-label">Export</div>
+          <button className="menu-item" onClick={pick(onReport)}>
+            <FileText size={15} /> Client report (PDF)
+          </button>
+          <button className="menu-item" onClick={pick(onDeck)}>
+            <Presentation size={15} /> Presentation (PowerPoint)
+          </button>
+          <button className="menu-item" onClick={pick(onJson)}>
+            <FileJson size={15} /> Campaign file (JSON)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   const s = useStore();
-  const [settings, setSettings] = useState<null | "account" | "members" | "billing">(null);
+  const [tool, setTool] = useState<"hand" | "select">("hand");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settings, setSettings] = useState<null | SettingsTab>(null);
+  const [matching, setMatching] = useState(false);
   const rf = useReactFlow();
   const [showBrief, setShowBrief] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -102,6 +158,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   // Messages after returning from OAuth or Stripe.
   useEffect(() => {
     const q = new URLSearchParams(location.search);
+    if (q.get("connected")) track("data_connected", { via: "oauth", type: q.get("connected") });
     if (q.get("connected")) flash(`Connected ${q.get("connected")!.replace(/_/g, " ")}. Select it on the canvas to choose an account.`);
     if (q.get("oauth_error")) flash(`Connection failed: ${q.get("oauth_error")}`);
     if (q.get("billing") === "success") {
@@ -158,6 +215,10 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       } else if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
         s.duplicateSelected();
+      } else if (e.key === "h" && !mod) {
+        setTool("hand");
+      } else if (e.key === "v" && !mod) {
+        setTool("select");
       } else if (e.key === "n" && !mod) {
         const { x, y } = rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
         s.addNode("sticky", { x: x - 100, y: y - 80 });
@@ -183,13 +244,15 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   const sync = async () => {
     setSyncing(true);
     try {
-      const r = await api.sync(graph);
+      const r = await api.sync(graph, s.boardId);
       if (!r.sources.length) {
         if (r.errors?.length) return flash(`Sync failed: ${r.errors.join("; ")}`);
-        flash("No connected data sources. Add an ad platform or GA4 integration to the canvas and connect it, or import a CSV.");
+        flash("No connected data sources yet. Open Settings → Integrations to connect an ad account, or import a CSV.");
+        setSettings("integrations");
       } else {
         s.applyActuals(r.actuals);
         s.setView("analyze");
+        track("data_connected", { via: "sync", sources: r.sources });
         flash(`Synced ${Object.keys(r.actuals).length} nodes from ${r.sources.join(", ")}${r.sample ? " (includes sample data from preview connectors)" : ""}.${r.errors?.length ? ` Problems: ${r.errors.join("; ")}` : ""}`);
       }
     } catch (e) {
@@ -223,10 +286,23 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       }
       s.applyActuals(map);
       s.setView("analyze");
+      track("data_connected", { via: "revenue_csv" });
       flash(`Attributed ${revenue.length - unmatched} of ${revenue.length} orders/deals to ${Object.keys(map).length} traffic sources by UTM (last touch).${unmatched ? ` ${unmatched} had no matching utm_source — set UTMs on your traffic nodes.` : ""}`);
       return;
     }
     const rows = parseActualsCSV(text);
+    const dated = rows.filter((r) => r.day);
+    if (dated.length && s.boardId) {
+      const resolved = dated.flatMap((r) => {
+        const n = s.nodes.find((n) => n.id === r.node || n.data.label.toLowerCase() === r.node.toLowerCase());
+        return n ? [{ nodeId: n.id, day: r.day!, ...r.actuals }] : [];
+      });
+      await api.importMetrics(s.boardId, resolved);
+      track("data_connected", { via: "csv_dated" });
+      s.setView("dashboard");
+      flash(`Imported ${resolved.length} dated rows into the dashboard history.`);
+      return;
+    }
     const map: Record<string, (typeof rows)[number]["actuals"]> = {};
     const missed: string[] = [];
     for (const r of rows) {
@@ -237,6 +313,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
     }
     s.applyActuals(map);
     s.setView("analyze");
+    track("data_connected", { via: "csv" });
     flash(`Imported actuals for ${Object.keys(map).length} nodes${missed.length ? `; no match for: ${missed.slice(0, 3).join(", ")}` : ""}.`);
   };
 
@@ -262,11 +339,19 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
 
   return (
     <SimContext.Provider value={sim}>
-      <div className={`app ${ro ? "read-only" : ""}`}>
+      <div className={`app ${ro ? "read-only" : ""}`} style={s.shareToken && s.shareBranding?.color ? ({ "--brand": s.shareBranding.color } as React.CSSProperties) : undefined}>
         <header className="topbar">
-          <a className="brand" href="/">
-            <span className="logo">◆</span> AdCanvas
-          </a>
+          {s.shareToken && s.shareBranding?.logo ? (
+            <span className="brand client-brand">
+              <img src={s.shareBranding.logo} alt="" /> {s.shareBranding.name}
+            </span>
+          ) : s.shareToken && s.shareBranding?.name ? (
+            <span className="brand">{s.shareBranding.name}</span>
+          ) : (
+            <a className="brand" href="/">
+              <span className="logo">◆</span> AdCanvas
+            </a>
+          )}
           {!s.shareToken && <BoardMenu onDialog={setDialog} onError={flash} onSettings={setSettings} />}
           <input className="title-input" value={s.name} readOnly={ro} onChange={(e) => s.setName(e.target.value)} aria-label="Campaign name" />
           <div className="seg" role="tablist">
@@ -276,10 +361,18 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             <button className={s.view === "analyze" ? "on" : ""} onClick={() => s.setView("analyze")}>
               <BarChart3 size={14} /> Analyze
             </button>
+            <button className={s.view === "dashboard" ? "on" : ""} onClick={() => s.setView("dashboard")}>
+              <LineChartIcon size={14} /> Dashboard
+            </button>
           </div>
           {!ro && <SaveStatus />}
           <div className="spacer" />
           <Presence />
+          {ro && s.shareToken && (
+            <a className="btn" href={`/report?share=${s.shareToken}`} target="_blank" rel="noreferrer">
+              <FileText size={15} /> Report
+            </a>
+          )}
           {ro ? (
             <span className="ro-badge">
               <Eye size={14} /> {s.shareToken ? "View only · comments on" : "Viewer access"}
@@ -296,6 +389,9 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               <button className="btn ghost" title="Pull metrics from connected integrations" onClick={sync} disabled={syncing}>
                 <RefreshCcw size={15} className={syncing ? "spin" : ""} /> Sync data
               </button>
+              <button className="icon-btn" title="Match live campaigns to the steps on this board" onClick={() => setMatching(true)}>
+                <Wand2 size={16} />
+              </button>
               <button
                 className="btn ghost"
                 title="Import a CSV: per-node actuals (node,spend,impressions,clicks,conversions,revenue) or orders/deals with utm_source,utm_campaign,revenue"
@@ -303,22 +399,30 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               >
                 <FileUp size={15} /> CSV
               </button>
-              <button
-                className="icon-btn"
-                title="Export campaign JSON"
-                onClick={() => download(`${s.name.replace(/\W+/g, "-").toLowerCase() || "campaign"}.adcanvas.json`, JSON.stringify({ ...graph, summary: s.summary }, null, 2))}
-              >
-                <Download size={16} />
-              </button>
+              <ExportMenu
+                onJson={() => download(`${s.name.replace(/\W+/g, "-").toLowerCase() || "campaign"}.adcanvas.json`, JSON.stringify({ ...graph, summary: s.summary }, null, 2))}
+                onReport={() => window.open(`/report?board=${s.boardId}`, "_blank")}
+                onDeck={async () => {
+                  flash("Building your presentation…");
+                  try {
+                    const { exportDeck } = await import("./lib/exports");
+                    await exportDeck({ graph, name: s.name, summary: s.summary, analysis: s.analysis, branding: s.me?.workspace.branding ?? null, workspaceName: s.me?.workspace.name ?? "" });
+                    track("exported", { kind: "pptx" });
+                  } catch (e) {
+                    flash(`Export failed: ${(e as Error).message}`);
+                  }
+                }}
+              />
               <button className="icon-btn" title="Import campaign JSON into this board" onClick={() => jsonInput.current?.click()}>
                 <Upload size={16} />
               </button>
               <span className="sep" />
-              <button className="btn primary" onClick={() => setShowBrief(true)}>
+              <button className="btn primary" data-tour="ai-build" onClick={() => setShowBrief(true)}>
                 <Sparkles size={15} /> AI Build
               </button>
             </>
           )}
+          {s.me && <NotificationBell />}
           {s.me && (
             <button className="avatar me" title={`${s.me.user.email} · ${s.me.workspace.name} (${s.me.role}) — settings`} onClick={() => setSettings("account")}>
               {(s.me.user.name || s.me.user.email).slice(0, 1).toUpperCase()}
@@ -335,9 +439,23 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
         </header>
 
         <div className="body">
-          {!ro && <Palette onAdd={addAtCenter} />}
+          {!ro && s.view !== "dashboard" && (
+            <div className={`palette-wrap ${paletteOpen ? "open" : ""}`} data-tour="palette">
+              <Palette
+                onAdd={(t) => {
+                  addAtCenter(t);
+                  setPaletteOpen(false);
+                }}
+              />
+            </div>
+          )}
 
-          <main className="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+          {s.view === "dashboard" && (
+            <Suspense fallback={<div className="boot grow"><span className="spinner" /></div>}>
+              <Dashboard onSync={sync} syncing={syncing} />
+            </Suspense>
+          )}
+          <main style={s.view === "dashboard" ? { display: "none" } : undefined} className={`canvas tool-${tool}`} data-tour="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
             <ReactFlow
               nodes={s.nodes}
               edges={s.edges}
@@ -361,14 +479,17 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               connectionMode={ConnectionMode.Loose}
               deleteKeyCode={ro ? null : ["Backspace", "Delete"]}
               multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-              selectionOnDrag={!ro}
-              panOnDrag={ro ? true : [1, 2]}
+              // Drag empty space to pan (like Miro's hand); Shift-drag or the Select tool draws a selection box.
+              selectionOnDrag={!ro && tool === "select"}
+              panOnDrag={ro || tool === "hand" ? true : [1, 2]}
+              selectionKeyCode="Shift"
               panOnScroll
               zoomOnPinch
               snapToGrid
               snapGrid={[10, 10]}
               minZoom={0.15}
               fitView
+              fitViewOptions={{ padding: 0.15, minZoom: 0.5, maxZoom: 1.1 }}
               proOptions={{ hideAttribution: true }}
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
@@ -381,7 +502,27 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               />
             </ReactFlow>
 
-            {s.nodes.length > 0 && <KpiBar sim={sim} />}
+            {s.nodes.length > 0 && (
+              <div data-tour="kpis" className="kpi-anchor">
+                <KpiBar sim={sim} />
+              </div>
+            )}
+            {!ro && (
+              <div className="tool-switch" role="radiogroup" aria-label="Canvas tool">
+                <button className={tool === "hand" ? "on" : ""} title="Hand: drag to move around (H)" onClick={() => setTool("hand")} role="radio" aria-checked={tool === "hand"}>
+                  <Hand size={16} />
+                </button>
+                <button className={tool === "select" ? "on" : ""} title="Select: drag to select several steps (V)" onClick={() => setTool("select")} role="radio" aria-checked={tool === "select"}>
+                  <MousePointer2 size={16} />
+                </button>
+              </div>
+            )}
+            {!ro && (
+              <button className="fab" onClick={() => setPaletteOpen(true)} aria-label="Add a step">
+                <Plus size={22} />
+              </button>
+            )}
+            {!ro && s.boardId && <Checklist />}
 
             {s.nodes.length === 0 && !ro && s.boardId && (
               <div className="welcome">
@@ -392,16 +533,17 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                     <Sparkles size={18} /> Build with AI
                   </button>
                 </div>
-                <p className="muted small">Or drag elements from the left. Drag empty space to select, right-drag or scroll to pan, press N for a sticky note.</p>
+                <p className="muted small">Or drag building blocks in from the left. Drag the canvas to move around, Shift-drag to select, and select any step then press + to add what comes next.</p>
               </div>
             )}
             {toast && <div className="toast">{toast}</div>}
           </main>
 
-          <aside className={`side ${s.panel ? "open" : ""}`}>
+          <aside className={`side ${s.panel ? "open" : ""}`} data-tour="side">
             <div className="tabs">
               {!ro && tab("inspector", <SlidersHorizontal size={14} />, "Inspect")}
               {tab("analysis", <BarChart3 size={14} />, "Insights")}
+              {tab("optimize", <Gauge size={14} />, "Optimize")}
               {!ro && tab("chat", <MessageCircle size={14} />, "AI")}
               {tab("comments", <MessageSquare size={14} />, "Comments", openComments)}
               {s.panel && (
@@ -423,6 +565,11 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                 ))}
               {s.panel === "analysis" && <AnalysisPanel integrations={integrations} />}
               {s.panel === "chat" && <ChatPanel />}
+              {s.panel === "optimize" && (
+                <Suspense fallback={<span className="spinner pad" />}>
+                  <OptimizePanel />
+                </Suspense>
+              )}
               {s.panel === "comments" && <CommentsPanel />}
             </div>
           </aside>
@@ -438,10 +585,19 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
             }}
           />
         )}
-        {settings && s.me && <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />}
+        {settings && s.me && (
+          <Suspense fallback={null}>
+            <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />
+          </Suspense>
+        )}
         {dialog === "share" && <ShareDialog onClose={() => setDialog(null)} />}
+        <ConfirmHost />
+        {matching && <AutoMatchDialog onClose={() => setMatching(false)} onDone={flash} />}
+        {!ro && <Tour enabled={!!s.boardId} />}
+        {paletteOpen && <div className="palette-scrim" onClick={() => setPaletteOpen(false)} />}
         {dialog === "reports" && <ReportsDialog integrations={integrations} onClose={() => setDialog(null)} />}
         {dialog === "privacy" && <PrivacyDialog onClose={() => setDialog(null)} />}
+        {dialog === "versions" && <VersionsDialog onClose={() => setDialog(null)} />}
       </div>
     </SimContext.Provider>
   );

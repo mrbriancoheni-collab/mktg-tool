@@ -3,6 +3,7 @@ import { AlertTriangle, FlaskConical, Gem, OctagonAlert, RefreshCw, Send, Sparkl
 import { api, type IntegrationInfo } from "../lib/api";
 import { toGraph, useStore } from "../lib/store";
 import { Markdown } from "./Markdown";
+import { track } from "../lib/track";
 
 const SEV = {
   critical: { icon: OctagonAlert, label: "Critical" },
@@ -28,6 +29,7 @@ export function AnalysisPanel({ integrations }: { integrations: IntegrationInfo[
     setError("");
     try {
       setAnalysis(await api.analyze(toGraph(useStore.getState())));
+      track("analysis_run");
       setView("analyze");
     } catch (e) {
       setError((e as Error).message);
@@ -114,6 +116,16 @@ export function AnalysisPanel({ integrations }: { integrations: IntegrationInfo[
               )}
               <p>{x.test}</p>
               <span className="impact">{x.expectedImpact}</span>
+              {!readOnly && (
+                <button
+                  className="link small track-exp"
+                  onClick={() => {
+                    useStore.setState({ pendingExperiment: { hypothesis: x.hypothesis, nodeId: x.nodeId }, panel: "optimize" });
+                  }}
+                >
+                  + Track this experiment
+                </button>
+              )}
             </div>
           ))}
 

@@ -13,9 +13,15 @@ import { decrypt, encrypt } from "../crypto";
 import { db } from "../db";
 import { postJSON } from "../net";
 import { PROVIDER_CONNECTORS } from "./providers";
+import { PROVIDER_CONNECTORS_2 } from "./providers2";
 
 export interface Credentials {
   [key: string]: string;
+}
+
+export interface DailyRow extends Actuals {
+  nodeId: string;
+  day: string;
 }
 
 export interface ConnectionCtx {
@@ -31,41 +37,33 @@ export interface Connector {
   type: string;
   fields: { key: string; label: string; secret?: boolean; placeholder?: string }[];
   /** Connect via OAuth instead of pasted credentials. */
-  oauth?: "google" | "meta";
+  oauth?: "google" | "meta" | "linkedin" | "tiktok";
   /** Canvas node types this account reports on. */
   reportsOn?: string[];
   live: boolean;
   fetchMetrics?(nodes: GraphNode[], ctx: ConnectionCtx): Promise<Record<string, Actuals>>;
+  /** Day-by-day metrics for [from, to] (YYYY-MM-DD), used for history and the dashboard. */
+  fetchDaily?(nodes: GraphNode[], ctx: ConnectionCtx, from: string, to: string): Promise<DailyRow[]>;
   notify?(text: string, creds: Credentials): Promise<void>;
 }
 
-function sampleMetrics(nodes: GraphNode[]): Record<string, Actuals> {
-  const out: Record<string, Actuals> = {};
+/** Deterministic pseudo-random sample history so previews look stable between syncs. */
+export function sampleDaily(nodes: GraphNode[], from: string, to: string): DailyRow[] {
+  const rows: DailyRow[] = [];
   for (const n of nodes) {
-    const budget = n.data.budget ?? 0;
+    const daily = (n.data.budget ?? 0) / 30;
     const cpc = n.data.cpc ?? 1;
-    const spend = budget * 0.4 * (0.85 + Math.random() * 0.3);
-    const clicks = spend / (cpc * (0.8 + Math.random() * 0.5));
-    out[n.id] = {
-      spend: Math.round(spend),
-      impressions: Math.round(clicks / (0.008 + Math.random() * 0.012)),
-      clicks: Math.round(clicks),
-      conversions: Math.round(clicks * (0.02 + Math.random() * 0.05)),
-    };
+    let seed = [...n.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    for (let d = new Date(from + "T00:00:00Z"); d <= new Date(to + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+      const weekend = [0, 6].includes(d.getUTCDay()) ? 0.8 : 1.05;
+      const spend = daily * weekend * (0.8 + rnd() * 0.4);
+      const clicks = spend / (cpc * (0.85 + rnd() * 0.35));
+      rows.push({ nodeId: n.id, day: d.toISOString().slice(0, 10), spend: Math.round(spend * 100) / 100, clicks: Math.round(clicks), impressions: Math.round(clicks / (0.01 + rnd() * 0.01)), conversions: Math.round(clicks * (0.02 + rnd() * 0.04)) });
+    }
   }
-  return out;
+  return rows;
 }
-
-const sampleConnector = (type: string, reportsOn: string[]): Connector => ({
-  type,
-  live: false,
-  reportsOn,
-  fields: [
-    { key: "account", label: "Ad account ID" },
-    { key: "token", label: "Access token", secret: true },
-  ],
-  fetchMetrics: async (nodes) => sampleMetrics(nodes),
-});
 
 const hook = (type: string, label: string, placeholder: string, secret = false): Connector => ({
   type,
@@ -76,11 +74,8 @@ const hook = (type: string, label: string, placeholder: string, secret = false):
 
 const SPECIFIC: Record<string, Connector> = {
   ...PROVIDER_CONNECTORS,
-  tiktok_ads_mgr: sampleConnector("tiktok_ads_mgr", ["tiktok_ads"]),
-  linkedin_cm: sampleConnector("linkedin_cm", ["linkedin_ads"]),
+  ...PROVIDER_CONNECTORS_2,
   gtm: { type: "gtm", live: false, fields: [{ key: "container", label: "Container ID", placeholder: "GTM-XXXX" }] },
-  salesforce: { type: "salesforce", live: false, fields: [{ key: "instance", label: "Instance URL" }, { key: "token", label: "Access token", secret: true }] },
-  shopify: { type: "shopify", live: false, fields: [{ key: "shop", label: "Shop domain", placeholder: "mystore.myshopify.com" }, { key: "token", label: "Admin API token", secret: true }] },
   zapier: hook("zapier", "Catch hook URL", "https://hooks.zapier.com/..."),
   make: hook("make", "Webhook URL", "https://hook.make.com/..."),
   slack: hook("slack", "Incoming webhook URL", "https://hooks.slack.com/services/...", true),
@@ -181,8 +176,40 @@ export async function notify(ws: string, type: string, text: string) {
   await c.notify(text.slice(0, 35000), conn.creds);
 }
 
-/** Pulls actuals for every node covered by a connected integration. */
-export async function syncMetrics(ws: string, graph: Graph) {
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+async function storeDaily(ws: string, boardId: string, source: string, rows: DailyRow[]) {
+  for (const r of rows)
+    await db().query(
+      `INSERT INTO metrics_daily (workspace_id, board_id, node_id, day, source, spend, impressions, clicks, conversions, revenue)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (board_id, node_id, day, source) DO UPDATE SET spend=EXCLUDED.spend, impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, conversions=EXCLUDED.conversions, revenue=EXCLUDED.revenue`,
+      [ws, boardId, r.nodeId, r.day, source, r.spend ?? null, r.impressions ?? null, r.clicks ?? null, r.conversions ?? null, r.revenue ?? null],
+    );
+}
+
+/** Imports dated rows (e.g. from a CSV with a date column). */
+export async function importDaily(ws: string, boardId: string, rows: DailyRow[], source = "csv") {
+  await storeDaily(ws, boardId, source, rows.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.day)).slice(0, 20000));
+}
+
+/** Month-to-date totals per node from rows. */
+function monthToDate(rows: DailyRow[]) {
+  const month = iso(new Date()).slice(0, 7);
+  const out: Record<string, Actuals> = {};
+  for (const r of rows) {
+    if (!r.day.startsWith(month)) continue;
+    const a = (out[r.nodeId] ??= {});
+    for (const k of ["spend", "impressions", "clicks", "conversions", "revenue"] as const) if (r[k] != null) a[k] = Math.round(((a[k] ?? 0) + r[k]!) * 100) / 100;
+  }
+  return out;
+}
+
+/**
+ * Pulls actuals for every node covered by a connected integration. With a
+ * boardId, connectors that support it also store 90 days of daily history.
+ */
+export async function syncMetrics(ws: string, graph: Graph, boardId?: string) {
   const actuals: Record<string, Actuals> = {};
   const sources: string[] = [];
   const errors: string[] = [];
@@ -194,7 +221,14 @@ export async function syncMetrics(ws: string, graph: Graph) {
     if (!nodes.length) continue;
     const ctx = (await getConnection(ws, c.type))!;
     try {
-      const got = await c.fetchMetrics(nodes, ctx);
+      let got: Record<string, Actuals>;
+      if (boardId && c.fetchDaily) {
+        const to = new Date();
+        const from = new Date(Date.now() - 89 * 86400e3);
+        const rows = await c.fetchDaily(nodes, ctx, iso(from), iso(to));
+        await storeDaily(ws, boardId, c.type, rows);
+        got = monthToDate(rows);
+      } else got = await c.fetchMetrics(nodes, ctx);
       for (const [id, a] of Object.entries(got)) actuals[id] = { ...actuals[id], ...a };
       sources.push(c.type);
       if (!c.live) sample = true;

@@ -85,7 +85,7 @@ export async function sendReport(board: Board, appUrl?: string) {
   const s = board.schedule;
   const ws = board.workspaceId;
   if (s?.syncFirst) {
-    const r = await integrations.syncMetrics(ws, board.graph);
+    const r = await integrations.syncMetrics(ws, board.graph, board.id);
     if (Object.keys(r.actuals).length) {
       for (const n of board.graph.nodes) if (r.actuals[n.id]) n.data.actuals = { ...n.data.actuals, ...r.actuals[n.id] };
       await saveGraph(ws, board.id, board.graph);
@@ -97,6 +97,17 @@ export async function sendReport(board: Board, appUrl?: string) {
   const results = await Promise.allSettled(channels.map((c) => integrations.notify(ws, c, text)));
   const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${channels[i]}: ${(r.reason as Error).message}`] : []));
   if (s) await setSchedule(ws, board.id, { ...s, lastSentAt: Date.now() });
+  const critical = alerts.filter((a) => a.severity === "critical");
+  if (critical.length || failed.length) {
+    const { adminsOf, notifyUsers } = await import("./features");
+    await notifyUsers(await adminsOf(ws), {
+      workspaceId: ws,
+      kind: failed.length ? "report_failed" : "alert",
+      title: failed.length ? `Report for “${board.name}” failed to send` : `${critical.length} critical alert${critical.length > 1 ? "s" : ""} on “${board.name}”`,
+      body: failed.length ? failed.join("; ") : critical.map((a) => a.message).join("\n"),
+      link: `/?board=${board.id}`,
+    });
+  }
   if (failed.length === channels.length) throw new Error(failed.join("; "));
   return { text, alerts, failed };
 }

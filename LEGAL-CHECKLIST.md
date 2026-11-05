@@ -45,8 +45,10 @@ Each platform reviews your app. Prepare these items before applying:
   - [ ] Pass app review for the Marketing API permissions you need.
   - [ ] Provide the data deletion instructions URL or a deletion callback.
   - [ ] Complete Meta's annual Data Use Checkup.
-- [ ] **LinkedIn:** Marketing Developer Platform application. Approval is selective, so describe the use case clearly.
-- [ ] **TikTok:** Marketing API developer application.
+- [ ] **LinkedIn:** Marketing Developer Platform application. Approval is selective, so describe the use case clearly. Live reporting is already built and waits only on approval.
+- [ ] **TikTok:** Marketing API developer application. Live reporting is built.
+- [ ] **Shopify:** customers create their own custom app, so there's no review. If you later list a public Shopify app, it needs Shopify's app review and protected customer data approval.
+- [ ] **Sign in with Google:** the same OAuth consent screen as above. The basic `openid email profile` scopes don't need extra verification.
 - [ ] Follow each platform's data-retention and display rules. For example, some require deleting data when access is revoked. The Disconnect action already deletes stored credentials.
 
 ## 5. Advertising and marketing law

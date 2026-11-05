@@ -18,8 +18,8 @@ import type { Analysis, Me } from "./api";
 
 export type StageNode = Node<StageData>;
 export type FlowEdge = Edge<EdgeData>;
-export type View = "build" | "analyze";
-export type Panel = "inspector" | "analysis" | "chat" | "comments" | null;
+export type View = "build" | "analyze" | "dashboard";
+export type Panel = "inspector" | "analysis" | "optimize" | "chat" | "comments" | null;
 export type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 export interface Person {
   clientId: string;
@@ -52,6 +52,7 @@ export interface BoardRecord {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  proposal?: { summary: string; ops: Op[]; described: string[]; warnings: string[]; status: "pending" | "applied" | "discarded" };
 }
 
 interface Snapshot {
@@ -62,6 +63,10 @@ interface Snapshot {
 
 interface State {
   me: Me | null;
+  /** Branding of the board's workspace when viewing a share link. */
+  shareBranding: { name?: string; color?: string; logo?: string; hidePoweredBy?: boolean } | null;
+  /** Experiment suggested by AI analysis, waiting to be added in the Optimize tab. */
+  pendingExperiment: { hypothesis: string; nodeId: string | null } | null;
   boardId: string | null;
   version: number;
   readOnly: boolean;
@@ -83,7 +88,7 @@ interface State {
   future: Snapshot[];
 
   loadBoard(b: BoardRecord, opts?: { readOnly?: boolean; shareToken?: string | null }): void;
-  setSync(patch: Partial<Pick<State, "saveState" | "version" | "others" | "comments" | "commentFilter" | "me">>): void;
+  setSync(patch: Partial<Pick<State, "saveState" | "version" | "others" | "comments" | "commentFilter" | "me" | "shareBranding">>): void;
   /** Applies edits made by someone else, preserving local selection. */
   applyRemoteOps(ops: Op[]): void;
   setName(name: string): void;
@@ -102,6 +107,8 @@ interface State {
   redo(): void;
 
   addNode(type: string, position: { x: number; y: number }): string;
+  /** Adds a step after `fromId`, positions it to the right, and connects it. */
+  addNextStep(fromId: string, type: string): string;
   updateNode(id: string, patch: Partial<StageData>): void;
   updateEdge(id: string, patch: Partial<EdgeData>): void;
   addAsset(nodeId: string, asset: Asset): void;
@@ -117,6 +124,8 @@ interface State {
 
 export const useStore = create<State>()((set, get) => ({
       me: null,
+      shareBranding: null,
+      pendingExperiment: null,
       boardId: null,
       version: 0,
       readOnly: false,
@@ -248,6 +257,14 @@ export const useStore = create<State>()((set, get) => ({
           nodes: [...get().nodes.map((n) => ({ ...n, selected: false })), node],
           panel: item.kind === "note" ? get().panel : "inspector",
         });
+        return id;
+      },
+      addNextStep: (fromId, type) => {
+        const from = get().nodes.find((n) => n.id === fromId);
+        if (!from) return "";
+        const siblings = get().edges.filter((e) => e.source === fromId).length;
+        const id = get().addNode(type, { x: from.position.x + 320, y: from.position.y + siblings * 150 });
+        set({ edges: addEdge({ id: `e_${nanoid(6)}`, source: fromId, target: id, type: "flow", data: {} }, get().edges) });
         return id;
       },
       updateNode: (id, patch) =>

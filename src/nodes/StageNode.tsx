@@ -1,4 +1,9 @@
-import { createContext, memo, useContext } from "react";
+import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Plus } from "lucide-react";
+import { suggestNext } from "../../shared/suggest";
+import { CATALOG } from "../../shared/catalog";
+import { track } from "../lib/track";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { CATALOG_BY_TYPE } from "../../shared/catalog";
 import type { SimulationResult } from "../../shared/model";
@@ -11,6 +16,7 @@ export const SimContext = createContext<SimulationResult | null>(null);
 function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeT>) {
   const sim = useContext(SimContext);
   const view = useStore((s) => s.view);
+  const readOnly = useStore((s) => s.readOnly);
   const analysis = useStore((s) => s.analysis);
   const openComments = useStore((s) => s.comments.reduce((n, c) => n + (c.nodeId === id && !c.resolved ? 1 : 0), 0));
   const findings = analysis?.findings.filter((f) => f.nodeId === id) ?? [];
@@ -82,6 +88,60 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeT>) {
         )}
       </div>
       <Handle type="source" position={Position.Right} />
+      {selected && data.kind !== "integration" && !readOnly && <QuickAdd fromId={id} type={data.type} />}
+    </div>
+  );
+}
+
+function QuickAdd({ fromId, type }: { fromId: string; type: string }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [pos, setPos] = useState({ left: 0, top: 0 });
+  const btn = useRef<HTMLButtonElement>(null);
+  const addNext = useStore((s) => s.addNextStep);
+  const suggestions = suggestNext(type).map((t) => CATALOG.find((c) => c.type === t)!);
+  const search = q.trim().toLowerCase();
+  const results = search ? CATALOG.filter((c) => c.kind !== "note" && c.kind !== "integration" && c.label.toLowerCase().includes(search)).slice(0, 8) : suggestions;
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !(e.target as HTMLElement).closest(".quick-add-menu, .quick-add-btn") && setOpen(false);
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const toggle = () => {
+    const r = btn.current!.getBoundingClientRect();
+    // Render the menu at normal size in a portal so it stays readable at any zoom level.
+    setPos({ left: Math.min(r.right + 8, window.innerWidth - 250), top: Math.min(Math.max(8, r.top - 20), window.innerHeight - 330) });
+    setQ("");
+    setOpen(!open);
+  };
+  const add = (t: string) => {
+    addNext(fromId, t);
+    track("node_added", { via: "quick_add", type: t });
+    setOpen(false);
+  };
+  return (
+    <div className="quick-add nodrag nopan" onPointerDown={(e) => e.stopPropagation()}>
+      <button ref={btn} className="quick-add-btn" title="Add next step" aria-label="Add next step" onClick={toggle}>
+        <Plus size={14} />
+      </button>
+      {open &&
+        createPortal(
+          <div className="quick-add-menu" style={{ left: pos.left, top: pos.top }} role="menu">
+            <input autoFocus placeholder="Search steps…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => (e.key === "Escape" ? setOpen(false) : e.key === "Enter" && results[0] && add(results[0].type))} />
+            <div className="quick-add-label">{search ? "Results" : "Suggested next steps"}</div>
+            {results.map((c) => (
+              <button key={c.type} className="quick-add-item" onClick={() => add(c.type)} role="menuitem">
+                <ItemIcon item={c} size={22} />
+                <span>{c.label}</span>
+              </button>
+            ))}
+            {!results.length && <span className="muted small">No matches</span>}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { BellRing, Check, Copy, Download, Link2, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { BellRing, Check, Copy, Download, History, Link2, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { api, type IntegrationInfo, type Schedule } from "../lib/api";
 import { useStore } from "../lib/store";
 import { newBoard } from "../lib/sync";
 import { Markdown } from "./Markdown";
+import { confirmDialog } from "./Confirm";
+import { track } from "../lib/track";
 
 function Modal({ title, icon, onClose, children }: { title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -37,6 +39,7 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
   const toggle = async (enabled: boolean) => {
     setBusy(true);
     setToken((await api.share(boardId, enabled)).shareToken);
+    if (enabled) track("shared", { via: "link" });
     setBusy(false);
   };
 
@@ -219,7 +222,7 @@ export function PrivacyDialog({ onClose }: { onClose: () => void }) {
           className="btn danger"
           disabled={busy}
           onClick={async () => {
-            if (prompt('Type DELETE to permanently erase all boards and integration credentials.') !== "DELETE") return;
+            if (!(await confirmDialog("Delete all workspace data?", { message: "Every board, comment and integration credential in this workspace will be permanently erased.", typeToConfirm: "DELETE", confirmLabel: "Delete everything", danger: true }))) return;
             setBusy(true);
             await api.deleteAllData();
             await newBoard();
@@ -233,6 +236,70 @@ export function PrivacyDialog({ onClose }: { onClose: () => void }) {
       <p className="muted small">
         AI features send board content to our AI provider to generate results. Don't put sensitive personal data (e.g. customer lists) into notes or prompts.
       </p>
+    </Modal>
+  );
+}
+
+export function VersionsDialog({ onClose }: { onClose: () => void }) {
+  const boardId = useStore((s) => s.boardId)!;
+  const [list, setList] = useState<Awaited<ReturnType<typeof api.versions>> | null>(null);
+  const [label, setLabel] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = () => api.versions(boardId).then(setList);
+  useEffect(() => {
+    load();
+  }, [boardId]);
+
+  const restore = async (id: string, when: string) => {
+    if (!(await confirmDialog("Restore this version?", { message: `The board will go back to how it was on ${when}. The current state is saved as a version first, so you can undo this.`, confirmLabel: "Restore" }))) return;
+    await api.saveVersion(boardId, "Before restore");
+    const v = await api.getVersion(boardId, id);
+    const s = useStore.getState();
+    s.checkpoint();
+    s.importGraph({ ...v.graph, name: v.name, goal: v.goal, summary: v.summary });
+    if (v.analysis) s.setAnalysis(v.analysis);
+    setMsg("Restored. Everyone on the board sees the change.");
+    load();
+  };
+
+  return (
+    <Modal title="Version history" icon={<History size={18} />} onClose={onClose}>
+      <p className="muted small">Versions are saved automatically every 30 minutes while you edit, before AI rebuilds the board, and whenever you save one here.</p>
+      <div className="row">
+        <input className="grow" placeholder="Name this version, e.g. “Sent to client”" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <button
+          className="btn primary"
+          onClick={async () => {
+            await api.saveVersion(boardId, label || "Saved version");
+            setLabel("");
+            setMsg("Version saved.");
+            load();
+          }}
+        >
+          Save version
+        </button>
+      </div>
+      {msg && <p className="ok small">{msg}</p>}
+      {!list && <span className="spinner" />}
+      {list && !list.length && <p className="muted small">No versions yet.</p>}
+      <div className="versions">
+        {list?.map((v) => {
+          const when = new Date(v.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+          return (
+            <div key={v.id} className="version-row">
+              <div className="grow">
+                <b>{v.label}</b>
+                <div className="muted small">
+                  {when} · {v.by} · {v.nodes} steps
+                </div>
+              </div>
+              <button className="btn" onClick={() => restore(v.id, when)}>
+                Restore
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </Modal>
   );
 }

@@ -151,6 +151,7 @@ export async function newBoard(init: Partial<BoardRecord> = {}) {
 
 export async function openShared(token: string) {
   const b = await api.shared(token);
+  useStore.getState().setSync({ shareBranding: b.branding ?? null });
   loadInto(b, { readOnly: true, shareToken: token });
   connect(`/api/shared/${token}/events?clientId=${clientId}&name=${encodeURIComponent(userName() || "Guest")}`);
 }

@@ -7,9 +7,10 @@ import type { AdPack } from "../shared/adpack";
 import { ASSET_LABELS, type AssetKind } from "../shared/catalog";
 import type { Graph } from "../shared/model";
 import { validOps } from "../shared/ops";
+import { matchCampaigns, type MatchSuggestion } from "../shared/automatch";
 import { roleAtLeast } from "../shared/plans";
-import { AIError, LIVE, analyzeFunnel, chat, generateAdPack, generateAsset, planCampaign, type ChatTurn } from "./ai";
-import { audit, authRouter, billingEnabled, effectivePlan, HttpError, originCheck, rateLimit, requireAuth, requireRole, sessionMiddleware } from "./auth";
+import { AIError, LIVE, analyzeFunnel, chat, generateAdPack, generateAsset, generateMockups, planCampaign, type ChatTurn } from "./ai";
+import { audit, authRouter, billingEnabled, effectivePlan, googleLoginEnabled, HttpError, originCheck, rateLimit, requireAuth, requireRole, sessionMiddleware } from "./auth";
 import { billingRouter, stripeWebhook } from "./billing";
 import { db } from "./db";
 import * as integrations from "./integrations";
@@ -19,6 +20,9 @@ import { broadcast, closeRoom, subscribe } from "./realtime";
 import { buildReport, detectAnomalies, sendReport } from "./reports";
 import * as store from "./store";
 import { assertAiQuota, meter } from "./usage";
+import { assistant } from "./assistant";
+import { activationFunnel, recordEvents } from "./analytics";
+import { adminsOf, autoSnapshot, featuresRouter, mentionedMembers, notifyUsers } from "./features";
 
 const appUrl = (req: Request) => process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
 
@@ -57,6 +61,12 @@ async function streamText(res: Response, gen: AsyncGenerator<string>) {
   res.setHeader("x-accel-buffering", "no");
   for await (const chunk of gen) res.write(chunk);
   res.end();
+}
+
+async function mustBoardById(req: Request, id: string) {
+  const b = await store.getBoard(req.auth!.workspace.id, id);
+  if (!b) throw new HttpError(404, "Board not found");
+  return b;
 }
 
 async function mustBoard(req: Request) {
@@ -99,7 +109,7 @@ export function createApp() {
 
   // ── Public ──
   app.get("/api/status", (_req, res) =>
-    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta") } }),
+    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), googleLogin: googleLoginEnabled(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta"), linkedin: providerConfigured("linkedin"), tiktok: providerConfigured("tiktok") } }),
   );
   app.use("/api", authRouter);
 
@@ -109,6 +119,17 @@ export function createApp() {
     Sentry.captureMessage(`Client error: ${String(message).slice(0, 300)}`, { level: "error", extra: { stack: String(stack ?? "").slice(0, 4000), url } });
     res.json({ ok: true });
   });
+
+  app.post("/api/events", rateLimit("events", 120, 60_000), wrap(async (req) => {
+    await recordEvents(req, Array.isArray(req.body?.events) ? req.body.events : []);
+    return { ok: true };
+  }));
+  // Internal analytics for operators: set ADMIN_EMAILS (comma-separated).
+  app.get("/api/admin/metrics", requireAuth, wrap(async (req) => {
+    const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (!admins.includes(req.auth!.user.email)) throw new HttpError(403, "Admins only.");
+    return activationFunnel(Number(req.query.days ?? 30));
+  }));
 
   // Share links: view + comment without an account.
   app.get("/api/shared/:token", wrap(async (req) => {
@@ -125,12 +146,14 @@ export function createApp() {
     const b = await store.getByShareToken(String(req.params.token));
     if (!b) throw new HttpError(404, "This share link is invalid or has been turned off.");
     const c = await store.addComment(b.id, commentInput(req, null));
+    await notifyUsers(await adminsOf(b.workspaceId), { workspaceId: b.workspaceId, kind: "guest_comment", title: `${c.author} commented on shared board “${b.name}”`, body: c.text, link: `/?board=${b.id}` });
     broadcast(b.id, "comments", { comments: await store.listComments(b.id) });
     return c;
   }));
 
   // ── Everything below requires a signed-in user ──
   app.use("/api", billingRouter);
+  app.use("/api", featuresRouter);
   app.use("/api", requireAuth);
 
   // AI
@@ -154,6 +177,27 @@ export function createApp() {
     const { graph, nodeId, finalUrl, instructions } = req.body as { graph: Graph; nodeId: string; finalUrl: string; instructions?: string };
     await assertAiQuota(req);
     return generateAdPack(graph, nodeId, finalUrl ?? "", instructions?.slice(0, 2000), meter(req, "adpack"));
+  }));
+  // Assistant: answers questions and proposes canvas edits (NDJSON stream).
+  app.post("/api/ai/assistant", requireRole("member"), wrap(async (req, res) => {
+    const { graph, history } = req.body as { graph: Graph; history: ChatTurn[] };
+    if (!graph || !history?.length) throw new HttpError(400, "Invalid request");
+    await assertAiQuota(req);
+    res.setHeader("content-type", "application/x-ndjson; charset=utf-8");
+    res.setHeader("cache-control", "no-cache");
+    res.setHeader("x-accel-buffering", "no");
+    const turns = history.slice(-20).map((t) => ({ role: t.role === "assistant" ? ("assistant" as const) : ("user" as const), content: String(t.content).slice(0, 20000) }));
+    try {
+      for await (const ev of assistant(graph, turns, meter(req, "assistant"))) res.write(JSON.stringify(ev) + "\n");
+    } catch (e) {
+      res.write(JSON.stringify({ type: "error", message: errorStatus(e)[1] }) + "\n");
+    }
+    res.end();
+  }));
+  app.post("/api/ai/mockups", requireRole("member"), wrap(async (req) => {
+    const { graph, nodeId } = req.body as { graph: Graph; nodeId: string };
+    await assertAiQuota(req);
+    return generateMockups(graph, nodeId, req.auth!.workspace.branding?.color, meter(req, "mockups"));
   }));
   app.post("/api/ai/chat", requireRole("member"), wrap(async (req, res) => {
     const { graph, history } = req.body as { graph: Graph; history: ChatTurn[] };
@@ -199,6 +243,7 @@ export function createApp() {
     const { ops, clientId } = req.body ?? {};
     if (!validOps(ops)) throw new HttpError(400, "Invalid operations");
     const version = await store.applyBoardOps(req.auth!.workspace.id, String(req.params.id), ops);
+    autoSnapshot(String(req.params.id), req.auth!.user.id).catch(() => {});
     broadcast(String(req.params.id), "ops", { ops, version, clientId, by: req.auth!.user.name || req.auth!.user.email }, clientId);
     return { version };
   }));
@@ -220,6 +265,8 @@ export function createApp() {
     const b = await mustBoard(req);
     req.body.author = req.auth!.user.name || req.auth!.user.email;
     const c = await store.addComment(b.id, commentInput(req, req.auth!.user.id));
+    const mentioned = (await mentionedMembers(req.auth!.workspace.id, c.text)).filter((m) => m.id !== req.auth!.user.id);
+    await notifyUsers(mentioned.map((m) => m.id), { workspaceId: req.auth!.workspace.id, kind: "mention", title: `${c.author} mentioned you on “${b.name}”`, body: c.text, link: `/?board=${b.id}` });
     broadcast(b.id, "comments", { comments: await store.listComments(b.id) });
     return c;
   }));
@@ -275,7 +322,45 @@ export function createApp() {
     await integrations.notify(ws(req), String(req.params.type), String(req.body?.text ?? ""));
     return { ok: true };
   }));
-  app.post("/api/integrations/sync", requireRole("member"), wrap((req) => integrations.syncMetrics(ws(req), req.body.graph as Graph)));
+  app.post("/api/integrations/sync", requireRole("member"), wrap(async (req) => {
+    const boardId = req.body?.boardId ? (await mustBoardById(req, String(req.body.boardId))).id : undefined;
+    return integrations.syncMetrics(ws(req), req.body.graph as Graph, boardId);
+  }));
+
+  // Performance history for the dashboard.
+  app.get("/api/boards/:id/metrics", wrap(async (req) => {
+    const b = await mustBoard(req);
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    const to = day.test(String(req.query.to)) ? String(req.query.to) : new Date().toISOString().slice(0, 10);
+    const from = day.test(String(req.query.from)) ? String(req.query.from) : new Date(Date.now() - 29 * 86400e3).toISOString().slice(0, 10);
+    const span = Math.max(1, Math.round((Date.parse(to) - Date.parse(from)) / 86400e3) + 1);
+    const prevTo = new Date(Date.parse(from) - 86400e3).toISOString().slice(0, 10);
+    const prevFrom = new Date(Date.parse(from) - span * 86400e3).toISOString().slice(0, 10);
+    const sum = `COALESCE(sum(spend),0)::float AS spend, COALESCE(sum(impressions),0)::float AS impressions, COALESCE(sum(clicks),0)::float AS clicks, COALESCE(sum(conversions),0)::float AS conversions, COALESCE(sum(revenue),0)::float AS revenue`;
+    const days = await db().query(`SELECT to_char(day,'YYYY-MM-DD') AS day, ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3 GROUP BY day ORDER BY day`, [b.id, from, to]);
+    const byNode = await db().query(`SELECT node_id AS "nodeId", ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3 GROUP BY node_id`, [b.id, from, to]);
+    const [totals] = await db().query(`SELECT ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3`, [b.id, from, to]);
+    const [previous] = await db().query(`SELECT ${sum} FROM metrics_daily WHERE board_id=$1 AND day BETWEEN $2 AND $3`, [b.id, prevFrom, prevTo]);
+    const [range] = await db().query(`SELECT to_char(min(day),'YYYY-MM-DD') AS first, to_char(max(day),'YYYY-MM-DD') AS last, array_agg(DISTINCT source) AS sources FROM metrics_daily WHERE board_id=$1`, [b.id]);
+    return { from, to, days, byNode, totals, previous, available: range };
+  }));
+  // Fills 90 days of clearly-labelled sample history so the dashboard can be explored.
+  app.post("/api/boards/:id/metrics/sample", requireRole("member"), wrap(async (req) => {
+    const b = await mustBoard(req);
+    const traffic = b.graph.nodes.filter((n) => n.data.kind === "traffic" && n.data.budget);
+    const price = b.graph.nodes.find((n) => n.data.price)?.data.price ?? 60;
+    const to = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 89 * 86400e3).toISOString().slice(0, 10);
+    const rows = integrations.sampleDaily(traffic, from, to).map((r) => ({ ...r, revenue: Math.round((r.conversions ?? 0) * price * (0.6 + Math.random() * 0.5)) }));
+    await integrations.importDaily(ws(req), b.id, rows, "sample");
+    return { ok: true, rows: rows.length };
+  }));
+  app.post("/api/boards/:id/metrics", requireRole("member"), wrap(async (req) => {
+    const b = await mustBoard(req);
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    await integrations.importDaily(ws(req), b.id, rows.filter((r: { nodeId?: string }) => b.graph.nodes.some((n) => n.id === r.nodeId)));
+    return { ok: true, imported: rows.length };
+  }));
 
   // OAuth connections (Google Ads, GA4, Meta)
   const requireLive = (req: Request) => {
@@ -315,6 +400,24 @@ export function createApp() {
     const ctx = await integrations.getConnection(ws(req), type);
     if (!ctx || !CAMPAIGN_LISTERS[type]) throw new HttpError(400, "Connect this integration first.");
     return CAMPAIGN_LISTERS[type](ctx);
+  }));
+  // Suggest which live campaigns belong to which canvas steps.
+  app.post("/api/boards/:id/automatch", requireRole("member"), wrap(async (req) => {
+    const b = await mustBoard(req);
+    const out: { connector: string; suggestions: MatchSuggestion[]; error?: string }[] = [];
+    for (const [type, list] of Object.entries(CAMPAIGN_LISTERS)) {
+      const ctx = await integrations.getConnection(ws(req), type);
+      const c = integrations.CONNECTORS[type];
+      if (!ctx?.account || !c?.reportsOn) continue;
+      const nodes = b.graph.nodes.filter((n) => c.reportsOn!.includes(n.data.type));
+      if (!nodes.length) continue;
+      try {
+        out.push({ connector: type, suggestions: matchCampaigns(nodes, await list(ctx), type) });
+      } catch (e) {
+        out.push({ connector: type, suggestions: [], error: (e as Error).message });
+      }
+    }
+    return out;
   }));
   app.get("/api/integrations/meta_ads_mgr/pages", requireRole("member"), wrap(async (req) => {
     const ctx = await integrations.getConnection(ws(req), "meta_ads_mgr");

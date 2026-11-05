@@ -1,13 +1,15 @@
 // Top-level routing: legal pages, auth pages, public share links, the
 // marketing site for signed-out visitors, and the app for signed-in users.
 
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import App from "./App";
 import { LegalPage } from "./components/LegalPage";
 import { api, onUnauthorized, type Me } from "./lib/api";
 import { useStore } from "./lib/store";
 import { AuthPage, type AuthMode } from "./pages/AuthPages";
 import { Landing } from "./pages/Landing";
+const Report = lazy(() => import("./pages/Report").then((m) => ({ default: m.Report })));
+const Admin = lazy(() => import("./pages/Admin").then((m) => ({ default: m.Admin })));
 
 // Report uncaught client errors to the server (forwarded to Sentry when configured).
 const report = (message: string, stack?: string) =>
@@ -40,6 +42,9 @@ export function Root() {
 
   const legal = path.match(/^\/legal\/([a-z-]+)\/?$/);
   if (legal) return <LegalPage slug={legal[1]} />;
+  const boot = <div className="boot"><span className="spinner" /></div>;
+  if (path === "/report" && (params.get("share") || me)) return <Suspense fallback={boot}><Report /></Suspense>;
+  if (path === "/admin" && me) return <Suspense fallback={boot}><Admin /></Suspense>;
 
   // Public share links don't need an account.
   if (params.get("share")) return <App readOnlyShare />;
