@@ -4,7 +4,7 @@ import { CATALOG_BY_TYPE } from "../shared/catalog";
 import type { Graph } from "../shared/model";
 import { simulate } from "../shared/simulate";
 import * as integrations from "./integrations";
-import { repo, type Board } from "./store";
+import { getBoardInternal, saveGraph, scheduledBoards, setSchedule, type Board } from "./store";
 
 export interface Alert {
   nodeId: string;
@@ -83,19 +83,20 @@ export function buildReport(board: Board, appUrl?: string) {
 
 export async function sendReport(board: Board, appUrl?: string) {
   const s = board.schedule;
+  const ws = board.workspaceId;
   if (s?.syncFirst) {
-    const r = await integrations.syncMetrics(board.graph);
-    for (const n of board.graph.nodes) if (r.actuals[n.id]) n.data.actuals = { ...n.data.actuals, ...r.actuals[n.id] };
+    const r = await integrations.syncMetrics(ws, board.graph);
+    if (Object.keys(r.actuals).length) {
+      for (const n of board.graph.nodes) if (r.actuals[n.id]) n.data.actuals = { ...n.data.actuals, ...r.actuals[n.id] };
+      await saveGraph(ws, board.id, board.graph);
+    }
   }
   const { text, alerts } = buildReport(board, appUrl);
   const channels = s?.channels?.length ? s.channels : [];
   if (!channels.length) throw new Error("Choose at least one delivery channel (Slack, webhook, Zapier or Make).");
-  const results = await Promise.allSettled(channels.map((c) => integrations.notify(c, text)));
+  const results = await Promise.allSettled(channels.map((c) => integrations.notify(ws, c, text)));
   const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${channels[i]}: ${(r.reason as Error).message}`] : []));
-  if (s) {
-    s.lastSentAt = Date.now();
-    repo.save(board);
-  }
+  if (s) await setSchedule(ws, board.id, { ...s, lastSentAt: Date.now() });
   if (failed.length === channels.length) throw new Error(failed.join("; "));
   return { text, alerts, failed };
 }
@@ -107,14 +108,18 @@ function isDue(s: NonNullable<Board["schedule"]>, now: Date) {
   return !s.lastSentAt || now.getTime() - s.lastSentAt > minGap;
 }
 
-/** Checks every minute for reports that are due. */
+/**
+ * Checks every minute for reports that are due. With several app instances,
+ * set RUN_SCHEDULER=true on exactly one of them.
+ */
 export function startScheduler(appUrl?: string) {
+  if (process.env.RUN_SCHEDULER === "false") return;
   const tick = async () => {
     const now = new Date();
-    for (const b of repo.all()) {
+    for (const b of await scheduledBoards().catch(() => [])) {
       if (!b.schedule || !isDue(b.schedule, now)) continue;
       try {
-        await sendReport(b, appUrl);
+        await sendReport((await getBoardInternal(b.id))!, appUrl);
         console.log(`[reports] sent "${b.name}"`);
       } catch (e) {
         console.error(`[reports] "${b.name}" failed:`, (e as Error).message);

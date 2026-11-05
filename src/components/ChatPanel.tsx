@@ -19,7 +19,10 @@ export function ChatPanel() {
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [chat, pending]);
+  useEffect(() => {
+    // Newer browsers return a Promise from scrollIntoView, which must not leak out of the effect.
+    void end.current?.scrollIntoView({ block: "end" });
+  }, [chat, pending]);
 
   const send = async (text: string) => {
     if (!text.trim() || pending !== null) return;

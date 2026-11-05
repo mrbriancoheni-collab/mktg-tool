@@ -8,9 +8,8 @@ AdCanvas uses only **strictly necessary** browser storage, which is needed for t
 |---|---|---|---|
 | `adcanvas-current-board` | Local storage | Reopens the board you were last working on | Until cleared |
 | `adcanvas-user-name` | Local storage | Name shown on your comments | Until cleared |
-| `adcanvas-client-id` | Local storage | Random ID used to show who else is viewing a board | Until cleared |
 | `adcanvas-seg` | Local storage | Remembers your B2B/B2C palette filter | Until cleared |
-| [SESSION COOKIE NAME] | Cookie | Keeps you signed in (once authentication is enabled) | [Session / 30 days] |
+| `adc_session` | Cookie (HttpOnly, Secure) | Keeps you signed in | 30 days, renewed while you use the app |
 
 We do not use advertising or cross-site tracking cookies.
 

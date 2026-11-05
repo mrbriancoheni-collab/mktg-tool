@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Download, Megaphone, Sparkles, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, Megaphone, Send, Sparkles, X } from "lucide-react";
 import { AD_SPECS, exportCSV, overLimit, type AdPack } from "../../shared/adpack";
 import { api } from "../lib/api";
 import { download } from "../lib/format";
@@ -100,6 +100,7 @@ export function AdPackDialog({ node, finalUrl, onClose }: { node: StageNode; fin
                 )}
               </div>
             ))}
+            <PublishPanel pack={pack} overLimit={overs > 0} />
             <footer>
               <button
                 className="btn primary"
@@ -114,6 +115,86 @@ export function AdPackDialog({ node, finalUrl, onClose }: { node: StageNode; fin
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Publish the pack to the ad platform as paused drafts (Google Ads) or ad creatives (Meta). */
+function PublishPanel({ pack, overLimit }: { pack: AdPack; overLimit: boolean }) {
+  const target = pack.format === "search" ? "google_ads_mgr" : pack.format === "social" ? "meta_ads_mgr" : null;
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [options, setOptions] = useState<{ id: string; name: string }[] | null>(null);
+  const [choice, setChoice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (!target) return;
+    api
+      .integrations()
+      .then((list) => setConnected(!!list.find((i) => i.type === target && i.connected && i.account)))
+      .catch(() => setConnected(false));
+  }, [target]);
+
+  if (!target) return null;
+  const label = target === "google_ads_mgr" ? "Google Ads" : "Meta";
+  if (connected === false)
+    return <p className="muted small publish-hint">Connect {label} {target === "google_ads_mgr" ? "" : "Ads Manager "}on the canvas (Pro plan) to publish these as drafts directly.</p>;
+  if (!connected) return null;
+
+  return (
+    <div className="publish">
+      <b>
+        <Send size={14} /> Publish to {label} as draft
+      </b>
+      <p className="muted small">
+        {target === "google_ads_mgr"
+          ? "Creates PAUSED ad groups with these responsive search ads and keywords inside a campaign you choose. Nothing goes live until you enable it."
+          : "Creates ad creatives in your ad account. Attach them to an ad set in Ads Manager to run them."}
+      </p>
+      <div className="row">
+        {options ? (
+          <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+            <option value="">{target === "google_ads_mgr" ? "Choose campaign…" : "Choose Facebook Page…"}</option>
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <button
+            className="btn"
+            onClick={() =>
+              (target === "google_ads_mgr" ? api.campaigns(target) : api.metaPages())
+                .then(setOptions)
+                .catch((e) => setMsg((e as Error).message))
+            }
+          >
+            {target === "google_ads_mgr" ? "Load campaigns" : "Load Pages"}
+          </button>
+        )}
+        <button
+          className="btn primary"
+          disabled={!choice || busy || overLimit}
+          title={overLimit ? "Fix fields over the character limit first" : ""}
+          onClick={async () => {
+            setBusy(true);
+            setMsg("");
+            try {
+              const r = await api.publish({ pack, target, ...(target === "google_ads_mgr" ? { campaignId: choice } : { pageId: choice }) });
+              setMsg(`Created ${r.created.length} draft${r.created.length === 1 ? "" : "s"}. ${r.note}`);
+            } catch (e) {
+              setMsg((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? <span className="spinner" /> : <Send size={14} />} Publish drafts
+        </button>
+      </div>
+      {msg && <p className="small">{msg}</p>}
     </div>
   );
 }

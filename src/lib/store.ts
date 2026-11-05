@@ -13,13 +13,19 @@ import { nanoid } from "nanoid";
 import { CATALOG_BY_TYPE } from "../../shared/catalog";
 import type { Actuals, Asset, EdgeData, Graph, PlanSpec, StageData } from "../../shared/model";
 import { layoutPlan } from "./layout";
-import type { Analysis } from "./api";
+import type { Op } from "../../shared/ops";
+import type { Analysis, Me } from "./api";
 
 export type StageNode = Node<StageData>;
 export type FlowEdge = Edge<EdgeData>;
 export type View = "build" | "analyze";
 export type Panel = "inspector" | "analysis" | "chat" | "comments" | null;
-export type SaveState = "idle" | "saving" | "saved" | "conflict" | "error" | "offline";
+export type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
+export interface Person {
+  clientId: string;
+  name: string;
+  editor: boolean;
+}
 
 export interface Comment {
   id: string;
@@ -39,6 +45,7 @@ export interface BoardRecord {
   graph: Graph;
   analysis: Analysis | null;
   comments: Comment[];
+  version: number;
   updatedAt: number;
 }
 
@@ -54,15 +61,14 @@ interface Snapshot {
 }
 
 interface State {
+  me: Me | null;
   boardId: string | null;
-  /** Server `updatedAt` of the version this client last loaded/saved. */
-  baseUpdatedAt: number;
+  version: number;
   readOnly: boolean;
   shareToken: string | null;
   saveState: SaveState;
-  conflict: BoardRecord | null;
   comments: Comment[];
-  others: string[];
+  others: Person[];
   commentFilter: string | null;
   name: string;
   goal: string;
@@ -77,7 +83,9 @@ interface State {
   future: Snapshot[];
 
   loadBoard(b: BoardRecord, opts?: { readOnly?: boolean; shareToken?: string | null }): void;
-  setSync(patch: Partial<Pick<State, "saveState" | "baseUpdatedAt" | "conflict" | "others" | "comments" | "commentFilter">>): void;
+  setSync(patch: Partial<Pick<State, "saveState" | "version" | "others" | "comments" | "commentFilter" | "me">>): void;
+  /** Applies edits made by someone else, preserving local selection. */
+  applyRemoteOps(ops: Op[]): void;
   setName(name: string): void;
   setGoal(goal: string): void;
   setView(v: View): void;
@@ -108,12 +116,12 @@ interface State {
 }
 
 export const useStore = create<State>()((set, get) => ({
+      me: null,
       boardId: null,
-      baseUpdatedAt: 0,
+      version: 0,
       readOnly: false,
       shareToken: null,
       saveState: "idle",
-      conflict: null,
       comments: [],
       others: [],
       commentFilter: null,
@@ -132,22 +140,15 @@ export const useStore = create<State>()((set, get) => ({
       loadBoard: (b, opts = {}) =>
         set({
           boardId: b.id,
-          baseUpdatedAt: b.updatedAt,
+          version: b.version ?? 0,
           readOnly: !!opts.readOnly,
           shareToken: opts.shareToken ?? null,
           saveState: "saved",
-          conflict: null,
           name: b.name,
           goal: b.goal ?? "",
           summary: b.summary ?? "",
-          nodes: b.graph.nodes.map((n) => ({
-            id: n.id,
-            type: n.data.kind === "note" ? "sticky" : "stage",
-            position: n.position ?? { x: 0, y: 0 },
-            data: n.data,
-            ...(n.data.kind === "note" ? { style: (n.data.size as object) ?? { width: 200, height: 160 } } : {}),
-          })),
-          edges: b.graph.edges.map((e) => ({ ...e, type: "flow", data: e.data ?? {} })),
+          nodes: b.graph.nodes.map(toFlowNode),
+          edges: b.graph.edges.map(toFlowEdge),
           analysis: b.analysis ?? null,
           comments: b.comments ?? [],
           chat: [],
@@ -157,6 +158,31 @@ export const useStore = create<State>()((set, get) => ({
           panel: opts.readOnly ? "analysis" : null,
         }),
       setSync: (patch) => set(patch),
+      applyRemoteOps: (ops) => {
+        let nodes = get().nodes;
+        let edges = get().edges;
+        const meta: Partial<State> = {};
+        for (const op of ops) {
+          if (op.t === "node.put") {
+            const existing = nodes.find((n) => n.id === op.node.id);
+            const next = toFlowNode(op.node);
+            nodes = existing
+              ? nodes.map((n) => (n.id === op.node.id ? { ...n, position: next.position, data: next.data, ...(next.style ? { style: next.style, width: undefined, height: undefined } : {}) } : n))
+              : [...nodes, next];
+          } else if (op.t === "node.del") {
+            nodes = nodes.filter((n) => n.id !== op.id);
+            edges = edges.filter((e) => e.source !== op.id && e.target !== op.id);
+          } else if (op.t === "edge.put") {
+            const next = toFlowEdge(op.edge);
+            edges = edges.some((e) => e.id === op.edge.id) ? edges.map((e) => (e.id === op.edge.id ? { ...e, ...next, selected: e.selected } : e)) : [...edges, next];
+          } else if (op.t === "edge.del") {
+            edges = edges.filter((e) => e.id !== op.id);
+          } else if (op.t === "meta") {
+            Object.assign(meta, op.patch);
+          }
+        }
+        set({ nodes, edges, ...meta });
+      },
       setName: (name) => set({ name }),
       setGoal: (goal) => set({ goal }),
       setView: (view) => set({ view }),
@@ -287,18 +313,27 @@ export const useStore = create<State>()((set, get) => ({
           name: g.name,
           goal: g.goal ?? "",
           summary: g.summary ?? "",
-          nodes: g.nodes.map((n) => ({
-            id: n.id,
-            type: n.data.kind === "note" ? "sticky" : "stage",
-            position: n.position ?? { x: 0, y: 0 },
-            data: n.data,
-          })),
-          edges: g.edges.map((e) => ({ ...e, type: "flow", data: e.data ?? {} })),
+          nodes: g.nodes.map(toFlowNode),
+          edges: g.edges.map(toFlowEdge),
           analysis: null,
         });
       },
     })
 );
+
+export function toFlowNode(n: Graph["nodes"][number]): StageNode {
+  return {
+    id: n.id,
+    type: n.data.kind === "note" ? "sticky" : "stage",
+    position: n.position ?? { x: 0, y: 0 },
+    data: n.data,
+    ...(n.data.kind === "note" ? { style: (n.data.size as object) ?? { width: 200, height: 160 } } : {}),
+  };
+}
+
+export function toFlowEdge(e: Graph["edges"][number]): FlowEdge {
+  return { ...e, type: "flow", data: e.data ?? {} };
+}
 
 /** Old single-board localStorage key from v1, migrated to the server on first load. */
 export const LEGACY_KEY = "adcanvas-board";

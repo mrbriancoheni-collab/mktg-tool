@@ -81,13 +81,16 @@ export function describeGraph(graph: Graph, sim: SimulationResult = simulate(gra
   return lines.join("\n");
 }
 
+/** Called with token usage after each live AI request (for metering). */
+export type OnUsage = (usage: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } | undefined, model: string) => void;
+
 function checkRefusal(msg: { stop_reason: string | null }) {
   if (msg.stop_reason === "refusal") throw new AIError("The model declined this request. Try rephrasing the brief.");
 }
 
 // ── 1. Build a campaign from a brief ──────────────────────────────
 
-export async function planCampaign(brief: string): Promise<Plan> {
+export async function planCampaign(brief: string, onUsage?: OnUsage): Promise<Plan> {
   if (!client) return demo.plan(brief);
   const msg = await client.beta.messages.parse({
     model: MODEL,
@@ -106,6 +109,7 @@ ${brief}
       },
     ],
   });
+  onUsage?.(msg.usage, msg.model);
   checkRefusal(msg);
   if (!msg.parsed_output) throw new AIError("Could not parse the campaign plan. Please try again.");
   return msg.parsed_output;
@@ -113,7 +117,7 @@ ${brief}
 
 // ── 2. Generate creative / copy for a node (streamed) ─────────────
 
-export async function* generateAsset(graph: Graph, nodeId: string, kind: AssetKind, instructions?: string) {
+export async function* generateAsset(graph: Graph, nodeId: string, kind: AssetKind, instructions?: string, onUsage?: OnUsage) {
   const node = graph.nodes.find((n) => n.id === nodeId);
   if (!node) throw new AIError("Node not found");
   if (!client) {
@@ -144,7 +148,9 @@ Return ready-to-use Markdown with no preamble.`,
   for await (const ev of stream) {
     if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") yield ev.delta.text;
   }
-  checkRefusal(await stream.finalMessage());
+  const final = await stream.finalMessage();
+  onUsage?.(final.usage, final.model);
+  checkRefusal(final);
 }
 
 function assetGuidance(kind: AssetKind) {
@@ -178,7 +184,7 @@ function assetGuidance(kind: AssetKind) {
 
 // ── 3. Analyze the funnel ─────────────────────────────────────────
 
-export async function analyzeFunnel(graph: Graph): Promise<Analysis> {
+export async function analyzeFunnel(graph: Graph, onUsage?: OnUsage): Promise<Analysis> {
   const sim = simulate(graph);
   if (!client) return demo.analysis(graph, sim);
   const msg = await client.beta.messages.parse({
@@ -198,6 +204,7 @@ Analyze this funnel. Where nodes have ACTUALS, compare them against the plan and
       },
     ],
   });
+  onUsage?.(msg.usage, msg.model);
   checkRefusal(msg);
   if (!msg.parsed_output) throw new AIError("Could not parse the analysis. Please try again.");
   return msg.parsed_output;
@@ -205,7 +212,7 @@ Analyze this funnel. Where nodes have ACTUALS, compare them against the plan and
 
 // ── 4. Platform-ready ad pack (structured, within character limits) ──
 
-export async function generateAdPack(graph: Graph, nodeId: string, finalUrl: string, instructions?: string): Promise<AdPack> {
+export async function generateAdPack(graph: Graph, nodeId: string, finalUrl: string, instructions?: string, onUsage?: OnUsage): Promise<AdPack> {
   const node = graph.nodes.find((n) => n.id === nodeId);
   const format = node && formatFor(node.data.type);
   if (!node || !format) throw new AIError("Ad packs are available for paid ad channels.");
@@ -234,7 +241,8 @@ export async function generateAdPack(graph: Graph, nodeId: string, finalUrl: str
         },
       ],
     });
-    checkRefusal(msg);
+    onUsage?.(msg.usage, msg.model);
+  checkRefusal(msg);
     if (!msg.parsed_output) throw new AIError("Could not parse the ad pack. Please try again.");
     pack = { ...msg.parsed_output, format, finalUrl };
   }
@@ -256,7 +264,7 @@ export interface ChatTurn {
   content: string;
 }
 
-export async function* chat(graph: Graph, history: ChatTurn[]) {
+export async function* chat(graph: Graph, history: ChatTurn[], onUsage?: OnUsage) {
   if (!client) {
     yield* demo.chat(graph, history);
     return;
@@ -280,7 +288,9 @@ export async function* chat(graph: Graph, history: ChatTurn[]) {
   for await (const ev of stream) {
     if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") yield ev.delta.text;
   }
-  checkRefusal(await stream.finalMessage());
+  const final = await stream.finalMessage();
+  onUsage?.(final.usage, final.model);
+  checkRefusal(final);
 }
 
 export type { GraphNode };

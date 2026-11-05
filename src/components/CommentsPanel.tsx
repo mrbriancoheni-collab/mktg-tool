@@ -31,7 +31,7 @@ export function CommentsPanel() {
     setError("");
     try {
       const c = await api.addComment({ boardId, shareToken }, { nodeId: filter, author: name.trim(), text });
-      setSync({ comments: [...useStore.getState().comments, c] });
+      setSync({ comments: [...useStore.getState().comments.filter((x) => x.id !== c.id), c] });
       setText("");
     } catch (e) {
       setError((e as Error).message);

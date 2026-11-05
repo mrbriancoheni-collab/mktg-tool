@@ -11,7 +11,6 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import {
-  AlertTriangle,
   BarChart3,
   Cloud,
   CloudOff,
@@ -45,7 +44,8 @@ import { Palette } from "./components/Palette";
 import { api, type IntegrationInfo } from "./lib/api";
 import { download, parseActualsCSV, parseRevenueCSV } from "./lib/format";
 import { toGraph, useStore, type Panel } from "./lib/store";
-import { resolveConflict, useBoardSync } from "./lib/sync";
+import { useBoardSync } from "./lib/sync";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { FlowEdge } from "./nodes/FlowEdge";
 import { SimContext, StageNode } from "./nodes/StageNode";
 import { StickyNode } from "./nodes/StickyNode";
@@ -68,10 +68,10 @@ function Presence() {
   const others = useStore((s) => s.others);
   if (!others.length) return null;
   return (
-    <div className="presence" title={`Also here: ${others.join(", ")}`}>
-      {others.slice(0, 4).map((n, i) => (
-        <span key={i} className="avatar" style={{ background: `hsl(${(n.charCodeAt(0) * 47) % 360} 60% 50%)` }}>
-          {n.slice(0, 1).toUpperCase()}
+    <div className="presence" title={`Also here: ${others.map((o) => o.name).join(", ")}`}>
+      {others.slice(0, 4).map((p) => (
+        <span key={p.clientId} className="avatar" title={`${p.name}${p.editor ? "" : " (viewing)"}`} style={{ background: `hsl(${(p.name.charCodeAt(0) * 47) % 360} 60% 50%)` }}>
+          {p.name.slice(0, 1).toUpperCase()}
         </span>
       ))}
       {others.length > 4 && <span className="avatar more">+{others.length - 4}</span>}
@@ -79,8 +79,9 @@ function Presence() {
   );
 }
 
-function Canvas() {
+function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   const s = useStore();
+  const [settings, setSettings] = useState<null | "account" | "members" | "billing">(null);
   const rf = useReactFlow();
   const [showBrief, setShowBrief] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -97,6 +98,17 @@ function Canvas() {
     setTimeout(() => setToast(""), 4000);
   }, []);
   useBoardSync(flash);
+
+  // Messages after returning from OAuth or Stripe.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (q.get("connected")) flash(`Connected ${q.get("connected")!.replace(/_/g, " ")}. Select it on the canvas to choose an account.`);
+    if (q.get("oauth_error")) flash(`Connection failed: ${q.get("oauth_error")}`);
+    if (q.get("billing") === "success") {
+      flash("Thanks! Your plan is being upgraded — it can take a few seconds to show.");
+      setTimeout(() => onAccountChange?.(), 3000);
+    }
+  }, [flash, onAccountChange]);
 
   const graph = useMemo(() => toGraph(s), [s.nodes, s.edges, s.name, s.goal]);
   const sim = useMemo(() => simulate(graph), [graph]);
@@ -173,11 +185,12 @@ function Canvas() {
     try {
       const r = await api.sync(graph);
       if (!r.sources.length) {
+        if (r.errors?.length) return flash(`Sync failed: ${r.errors.join("; ")}`);
         flash("No connected data sources. Add an ad platform or GA4 integration to the canvas and connect it, or import a CSV.");
       } else {
         s.applyActuals(r.actuals);
         s.setView("analyze");
-        flash(`Synced ${Object.keys(r.actuals).length} nodes from ${r.sources.join(", ")}${r.sample ? " (sample data)" : ""}.`);
+        flash(`Synced ${Object.keys(r.actuals).length} nodes from ${r.sources.join(", ")}${r.sample ? " (includes sample data from preview connectors)" : ""}.${r.errors?.length ? ` Problems: ${r.errors.join("; ")}` : ""}`);
       }
     } catch (e) {
       flash((e as Error).message);
@@ -254,7 +267,7 @@ function Canvas() {
           <a className="brand" href="/">
             <span className="logo">◆</span> AdCanvas
           </a>
-          {!ro && <BoardMenu onDialog={setDialog} onError={flash} />}
+          {!s.shareToken && <BoardMenu onDialog={setDialog} onError={flash} onSettings={setSettings} />}
           <input className="title-input" value={s.name} readOnly={ro} onChange={(e) => s.setName(e.target.value)} aria-label="Campaign name" />
           <div className="seg" role="tablist">
             <button className={s.view === "build" ? "on" : ""} onClick={() => s.setView("build")}>
@@ -269,7 +282,7 @@ function Canvas() {
           <Presence />
           {ro ? (
             <span className="ro-badge">
-              <Eye size={14} /> View only · comments on
+              <Eye size={14} /> {s.shareToken ? "View only · comments on" : "Viewer access"}
             </span>
           ) : (
             <>
@@ -306,6 +319,11 @@ function Canvas() {
               </button>
             </>
           )}
+          {s.me && (
+            <button className="avatar me" title={`${s.me.user.email} · ${s.me.workspace.name} (${s.me.role}) — settings`} onClick={() => setSettings("account")}>
+              {(s.me.user.name || s.me.user.email).slice(0, 1).toUpperCase()}
+            </button>
+          )}
           <span
             className={`ai-badge ${aiMode ?? "off"}`}
             title={aiMode === "demo" ? "No API key configured — AI responses are demo templates" : aiMode === "live" ? "Connected to Claude" : "Server offline"}
@@ -315,19 +333,6 @@ function Canvas() {
           <input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={(e) => e.target.files?.[0] && importCSV(e.target.files[0]).finally(() => (e.target.value = ""))} />
           <input ref={jsonInput} type="file" accept=".json,application/json" hidden onChange={(e) => e.target.files?.[0] && importJSON(e.target.files[0]).finally(() => (e.target.value = ""))} />
         </header>
-
-        {s.saveState === "conflict" && (
-          <div className="conflict">
-            <AlertTriangle size={16} />
-            <span>Someone else saved this board while you were editing.</span>
-            <button className="btn" onClick={() => resolveConflict("theirs")}>
-              Load their version
-            </button>
-            <button className="btn primary" onClick={() => resolveConflict("mine")}>
-              Keep mine (overwrite)
-            </button>
-          </div>
-        )}
 
         <div className="body">
           {!ro && <Palette onAdd={addAtCenter} />}
@@ -433,6 +438,7 @@ function Canvas() {
             }}
           />
         )}
+        {settings && s.me && <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />}
         {dialog === "share" && <ShareDialog onClose={() => setDialog(null)} />}
         {dialog === "reports" && <ReportsDialog integrations={integrations} onClose={() => setDialog(null)} />}
         {dialog === "privacy" && <PrivacyDialog onClose={() => setDialog(null)} />}
@@ -441,10 +447,10 @@ function Canvas() {
   );
 }
 
-export default function App() {
+export default function App({ onAccountChange }: { readOnlyShare?: boolean; onAccountChange?: () => void }) {
   return (
     <ReactFlowProvider>
-      <Canvas />
+      <Canvas onAccountChange={onAccountChange} />
     </ReactFlowProvider>
   );
 }

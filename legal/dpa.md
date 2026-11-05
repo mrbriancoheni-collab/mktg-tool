@@ -41,8 +41,8 @@ Processor will not sell or share Personal Data. It will not retain, use or discl
 When the Service ends, and at Controller's choice, Processor will return or delete Personal Data within [30] days. Backups will be deleted within [35] days, unless the law requires storage. In-app export and deletion tools are available at any time.
 
 ## Annex II — Technical and organizational measures
-- Encryption in transit (TLS 1.2+) and at rest. Integration credentials are encrypted at the application level.
-- Role-based access control, least privilege, multi-factor authentication for administrative access, and access logging.
+- Encryption in transit (TLS 1.2+) and at rest. Integration credentials are additionally encrypted with AES-256-GCM at the application level; passwords are hashed with scrypt.
+- Role-based access control (owner/admin/member/viewer), least privilege, multi-factor authentication for our administrative access, and an audit log of security-relevant actions.
 - Logical separation of customer workspaces.
 - Unguessable share-link tokens that the owner can revoke.
 - Vulnerability management, dependency patching, and [annual] penetration testing.
