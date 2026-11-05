@@ -3,6 +3,8 @@ import { Sparkles, X } from "lucide-react";
 import { TEMPLATES, buildTemplate } from "../../shared/templates";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { confirmDialog } from "./Confirm";
+import { track } from "../lib/track";
 
 const EXAMPLES = [
   "Launch a $40 eco-friendly water bottle to US millennials. $15k/month budget, goal: 3x ROAS within 60 days.",
@@ -19,12 +21,13 @@ export function BriefModal({ onClose, onDone }: { onClose: () => void; onDone: (
 
   const generate = async () => {
     if (!brief.trim()) return;
-    if (hasNodes && !confirm("Replace the current canvas with a new AI-generated campaign? (You can undo.)")) return;
+    if (hasNodes && !(await confirmDialog("Replace this board?", { message: "The AI campaign will replace what's on the canvas. You can undo, and version history keeps a copy.", confirmLabel: "Replace" }))) return;
     setBusy(true);
     setError("");
     try {
       const plan = await api.plan(brief);
       loadPlan(plan, brief);
+      track("board_built", { via: "ai" });
       onDone(true);
     } catch (e) {
       setError((e as Error).message);
@@ -77,9 +80,10 @@ export function BriefModal({ onClose, onDone }: { onClose: () => void; onDone: (
               key={t.id}
               className="template"
               disabled={busy}
-              onClick={() => {
-                if (hasNodes && !confirm("Replace the current canvas? (You can undo.)")) return;
+              onClick={async () => {
+                if (hasNodes && !(await confirmDialog("Replace this board?", { message: "The template will replace what's on the canvas. You can undo.", confirmLabel: "Replace" }))) return;
                 loadPlan(buildTemplate(t.id));
+                track("board_built", { via: "template", template: t.id });
                 onDone(true);
               }}
             >

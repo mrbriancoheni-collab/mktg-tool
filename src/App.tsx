@@ -15,6 +15,9 @@ import {
   Cloud,
   CloudOff,
   Download,
+  Hand,
+  MousePointer2,
+  Plus,
   Eye,
   FileUp,
   Hammer,
@@ -46,6 +49,9 @@ import { download, parseActualsCSV, parseRevenueCSV } from "./lib/format";
 import { toGraph, useStore, type Panel } from "./lib/store";
 import { useBoardSync } from "./lib/sync";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { ConfirmHost } from "./components/Confirm";
+import { Checklist, Tour } from "./components/Onboarding";
+import { track } from "./lib/track";
 import { FlowEdge } from "./nodes/FlowEdge";
 import { SimContext, StageNode } from "./nodes/StageNode";
 import { StickyNode } from "./nodes/StickyNode";
@@ -81,6 +87,8 @@ function Presence() {
 
 function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   const s = useStore();
+  const [tool, setTool] = useState<"hand" | "select">("hand");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [settings, setSettings] = useState<null | "account" | "members" | "billing">(null);
   const rf = useReactFlow();
   const [showBrief, setShowBrief] = useState(false);
@@ -102,6 +110,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
   // Messages after returning from OAuth or Stripe.
   useEffect(() => {
     const q = new URLSearchParams(location.search);
+    if (q.get("connected")) track("data_connected", { via: "oauth", type: q.get("connected") });
     if (q.get("connected")) flash(`Connected ${q.get("connected")!.replace(/_/g, " ")}. Select it on the canvas to choose an account.`);
     if (q.get("oauth_error")) flash(`Connection failed: ${q.get("oauth_error")}`);
     if (q.get("billing") === "success") {
@@ -158,6 +167,10 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       } else if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
         s.duplicateSelected();
+      } else if (e.key === "h" && !mod) {
+        setTool("hand");
+      } else if (e.key === "v" && !mod) {
+        setTool("select");
       } else if (e.key === "n" && !mod) {
         const { x, y } = rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
         s.addNode("sticky", { x: x - 100, y: y - 80 });
@@ -190,6 +203,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       } else {
         s.applyActuals(r.actuals);
         s.setView("analyze");
+        track("data_connected", { via: "sync", sources: r.sources });
         flash(`Synced ${Object.keys(r.actuals).length} nodes from ${r.sources.join(", ")}${r.sample ? " (includes sample data from preview connectors)" : ""}.${r.errors?.length ? ` Problems: ${r.errors.join("; ")}` : ""}`);
       }
     } catch (e) {
@@ -223,6 +237,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
       }
       s.applyActuals(map);
       s.setView("analyze");
+      track("data_connected", { via: "revenue_csv" });
       flash(`Attributed ${revenue.length - unmatched} of ${revenue.length} orders/deals to ${Object.keys(map).length} traffic sources by UTM (last touch).${unmatched ? ` ${unmatched} had no matching utm_source — set UTMs on your traffic nodes.` : ""}`);
       return;
     }
@@ -237,6 +252,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
     }
     s.applyActuals(map);
     s.setView("analyze");
+    track("data_connected", { via: "csv" });
     flash(`Imported actuals for ${Object.keys(map).length} nodes${missed.length ? `; no match for: ${missed.slice(0, 3).join(", ")}` : ""}.`);
   };
 
@@ -314,7 +330,7 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                 <Upload size={16} />
               </button>
               <span className="sep" />
-              <button className="btn primary" onClick={() => setShowBrief(true)}>
+              <button className="btn primary" data-tour="ai-build" onClick={() => setShowBrief(true)}>
                 <Sparkles size={15} /> AI Build
               </button>
             </>
@@ -335,9 +351,18 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
         </header>
 
         <div className="body">
-          {!ro && <Palette onAdd={addAtCenter} />}
+          {!ro && (
+            <div className={`palette-wrap ${paletteOpen ? "open" : ""}`} data-tour="palette">
+              <Palette
+                onAdd={(t) => {
+                  addAtCenter(t);
+                  setPaletteOpen(false);
+                }}
+              />
+            </div>
+          )}
 
-          <main className="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+          <main className={`canvas tool-${tool}`} data-tour="canvas" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
             <ReactFlow
               nodes={s.nodes}
               edges={s.edges}
@@ -361,14 +386,17 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               connectionMode={ConnectionMode.Loose}
               deleteKeyCode={ro ? null : ["Backspace", "Delete"]}
               multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-              selectionOnDrag={!ro}
-              panOnDrag={ro ? true : [1, 2]}
+              // Drag empty space to pan (like Miro's hand); Shift-drag or the Select tool draws a selection box.
+              selectionOnDrag={!ro && tool === "select"}
+              panOnDrag={ro || tool === "hand" ? true : [1, 2]}
+              selectionKeyCode="Shift"
               panOnScroll
               zoomOnPinch
               snapToGrid
               snapGrid={[10, 10]}
               minZoom={0.15}
               fitView
+              fitViewOptions={{ padding: 0.15, minZoom: 0.5, maxZoom: 1.1 }}
               proOptions={{ hideAttribution: true }}
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
@@ -381,7 +409,27 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
               />
             </ReactFlow>
 
-            {s.nodes.length > 0 && <KpiBar sim={sim} />}
+            {s.nodes.length > 0 && (
+              <div data-tour="kpis" className="kpi-anchor">
+                <KpiBar sim={sim} />
+              </div>
+            )}
+            {!ro && (
+              <div className="tool-switch" role="radiogroup" aria-label="Canvas tool">
+                <button className={tool === "hand" ? "on" : ""} title="Hand: drag to move around (H)" onClick={() => setTool("hand")} role="radio" aria-checked={tool === "hand"}>
+                  <Hand size={16} />
+                </button>
+                <button className={tool === "select" ? "on" : ""} title="Select: drag to select several steps (V)" onClick={() => setTool("select")} role="radio" aria-checked={tool === "select"}>
+                  <MousePointer2 size={16} />
+                </button>
+              </div>
+            )}
+            {!ro && (
+              <button className="fab" onClick={() => setPaletteOpen(true)} aria-label="Add a step">
+                <Plus size={22} />
+              </button>
+            )}
+            {!ro && s.boardId && <Checklist />}
 
             {s.nodes.length === 0 && !ro && s.boardId && (
               <div className="welcome">
@@ -392,13 +440,13 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
                     <Sparkles size={18} /> Build with AI
                   </button>
                 </div>
-                <p className="muted small">Or drag elements from the left. Drag empty space to select, right-drag or scroll to pan, press N for a sticky note.</p>
+                <p className="muted small">Or drag building blocks in from the left. Drag the canvas to move around, Shift-drag to select, and select any step then press + to add what comes next.</p>
               </div>
             )}
             {toast && <div className="toast">{toast}</div>}
           </main>
 
-          <aside className={`side ${s.panel ? "open" : ""}`}>
+          <aside className={`side ${s.panel ? "open" : ""}`} data-tour="side">
             <div className="tabs">
               {!ro && tab("inspector", <SlidersHorizontal size={14} />, "Inspect")}
               {tab("analysis", <BarChart3 size={14} />, "Insights")}
@@ -440,6 +488,9 @@ function Canvas({ onAccountChange }: { onAccountChange?: () => void }) {
         )}
         {settings && s.me && <SettingsDialog me={s.me} initialTab={settings} onClose={() => setSettings(null)} onChanged={() => onAccountChange?.()} />}
         {dialog === "share" && <ShareDialog onClose={() => setDialog(null)} />}
+        <ConfirmHost />
+        {!ro && <Tour enabled={!!s.boardId} />}
+        {paletteOpen && <div className="palette-scrim" onClick={() => setPaletteOpen(false)} />}
         {dialog === "reports" && <ReportsDialog integrations={integrations} onClose={() => setDialog(null)} />}
         {dialog === "privacy" && <PrivacyDialog onClose={() => setDialog(null)} />}
       </div>

@@ -4,6 +4,8 @@ import { api, type IntegrationInfo, type Schedule } from "../lib/api";
 import { useStore } from "../lib/store";
 import { newBoard } from "../lib/sync";
 import { Markdown } from "./Markdown";
+import { confirmDialog } from "./Confirm";
+import { track } from "../lib/track";
 
 function Modal({ title, icon, onClose, children }: { title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -37,6 +39,7 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
   const toggle = async (enabled: boolean) => {
     setBusy(true);
     setToken((await api.share(boardId, enabled)).shareToken);
+    if (enabled) track("shared", { via: "link" });
     setBusy(false);
   };
 
@@ -219,7 +222,7 @@ export function PrivacyDialog({ onClose }: { onClose: () => void }) {
           className="btn danger"
           disabled={busy}
           onClick={async () => {
-            if (prompt('Type DELETE to permanently erase all boards and integration credentials.') !== "DELETE") return;
+            if (!(await confirmDialog("Delete all workspace data?", { message: "Every board, comment and integration credential in this workspace will be permanently erased.", typeToConfirm: "DELETE", confirmLabel: "Delete everything", danger: true }))) return;
             setBusy(true);
             await api.deleteAllData();
             await newBoard();

@@ -9,6 +9,7 @@ import { PLANS, roleAtLeast, type PlanId, type Role } from "../shared/plans";
 import { hashPassword, newId, randomToken, sha256, verifyPassword } from "./crypto";
 import { db, ms, type Db } from "./db";
 import { sendEmail } from "./email";
+import { serverEvent } from "./analytics";
 
 export const TERMS_VERSION = "2026-11-05";
 const COOKIE = "adc_session";
@@ -239,6 +240,7 @@ authRouter.post("/auth/signup", authLimiter, wrap(async (req, res) => {
   else ws = await db().tx((q) => createWorkspace(q, String(workspaceName ?? "").trim() || `${String(name ?? "").trim() || email.split("@")[0]}'s workspace`, userId));
   await createSession(req, res, userId, ws);
   await audit(req, "user.signup", userId, { termsVersion: TERMS_VERSION }, ws);
+  serverEvent("signup", userId, ws, { invited: !!invite });
   return { ok: true };
 }));
 

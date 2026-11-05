@@ -205,6 +205,79 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX audit_ws_time ON audit_log(workspace_id, created_at DESC);
   `,
+  // 2 — history, collaboration extras, analytics, security
+  `
+  ALTER TABLE users ADD COLUMN mfa_secret_enc TEXT;
+  ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE users ADD COLUMN mfa_recovery JSONB;
+  ALTER TABLE users ADD COLUMN google_sub TEXT UNIQUE;
+  ALTER TABLE sessions ADD COLUMN mfa_pending BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE workspaces ADD COLUMN branding JSONB;
+  CREATE TABLE metrics_daily (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    node_id TEXT NOT NULL,
+    day DATE NOT NULL,
+    source TEXT NOT NULL,
+    spend DOUBLE PRECISION,
+    impressions DOUBLE PRECISION,
+    clicks DOUBLE PRECISION,
+    conversions DOUBLE PRECISION,
+    revenue DOUBLE PRECISION,
+    PRIMARY KEY (board_id, node_id, day, source)
+  );
+  CREATE INDEX metrics_board_day ON metrics_daily(board_id, day);
+  CREATE TABLE board_versions (
+    id BIGSERIAL PRIMARY KEY,
+    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    snapshot JSONB NOT NULL,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX board_versions_board ON board_versions(board_id, created_at DESC);
+  CREATE TABLE experiments (
+    id TEXT PRIMARY KEY,
+    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    node_id TEXT,
+    hypothesis TEXT NOT NULL,
+    variants JSONB NOT NULL DEFAULT '[]',
+    metric TEXT NOT NULL DEFAULT 'conversion rate',
+    status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','running','won','lost','inconclusive')),
+    result TEXT,
+    started_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX experiments_board ON experiments(board_id);
+  CREATE TABLE notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    link TEXT,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX notifications_user ON notifications(user_id, created_at DESC);
+  CREATE TABLE events (
+    id BIGSERIAL PRIMARY KEY,
+    workspace_id TEXT,
+    user_id TEXT,
+    event TEXT NOT NULL,
+    props JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX events_event_time ON events(event, created_at);
+  CREATE TABLE rate_limits (
+    key TEXT PRIMARY KEY,
+    count INTEGER NOT NULL,
+    reset_at TIMESTAMPTZ NOT NULL
+  );
+  `,
 ];
 
 async function migrate(db: Db) {

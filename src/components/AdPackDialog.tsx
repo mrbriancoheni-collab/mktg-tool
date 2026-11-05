@@ -4,6 +4,7 @@ import { AD_SPECS, exportCSV, overLimit, type AdPack } from "../../shared/adpack
 import { api } from "../lib/api";
 import { download } from "../lib/format";
 import { toGraph, useStore, type StageNode } from "../lib/store";
+import { track } from "../lib/track";
 
 type Field = "headlines" | "descriptions" | "primaryTexts";
 const LIMIT_KEY: Record<Field, "headline" | "description" | "primary"> = { headlines: "headline", descriptions: "description", primaryTexts: "primary" };
@@ -19,6 +20,7 @@ export function AdPackDialog({ node, finalUrl, onClose }: { node: StageNode; fin
     setError("");
     try {
       setPack(await api.adPack(toGraph(useStore.getState()), node.id, finalUrl, direction));
+      track("asset_generated", { kind: "adpack" });
     } catch (e) {
       setError((e as Error).message);
     } finally {

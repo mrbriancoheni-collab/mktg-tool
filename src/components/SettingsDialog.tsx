@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Check, Copy, CreditCard, History, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
 import { PLANS, PUBLIC_PLANS, roleAtLeast, type Role } from "../../shared/plans";
 import { api, type Member, type Me } from "../lib/api";
+import { confirmDialog } from "./Confirm";
+import { track } from "../lib/track";
 
 type Tab = "account" | "members" | "billing" | "workspace" | "audit";
 
@@ -117,11 +119,13 @@ function AccountTab({ me, onChanged }: { me: Me; onChanged: () => void }) {
             className="btn danger"
             disabled={!delPw}
             onClick={() =>
-              confirm("Permanently delete your account? This cannot be undone.") &&
+              confirmDialog("Delete your account?", { message: "This cannot be undone. Workspaces where you're the only owner are deleted too.", confirmLabel: "Delete account", danger: true }).then(
+                (ok) =>
+                  void (ok &&
               run(async () => {
                 await api.deleteAccount(delPw);
                 location.href = "/";
-              }, "Deleted.")
+              }, "Deleted.")))
             }
           >
             <Trash2 size={14} /> Delete account
@@ -172,6 +176,7 @@ function MembersTab({ me, admin, owner, onChanged }: { me: Me; admin: boolean; o
               onClick={() =>
                 run(async () => {
                   const r = await api.invite(email, role);
+                  track("shared", { via: "invite" });
                   setLink(r.url);
                   setEmail("");
                   await load();
@@ -224,13 +229,13 @@ function MembersTab({ me, admin, owner, onChanged }: { me: Me; admin: boolean; o
                 </td>
                 <td className="right">
                   {m.id === me.user.id ? (
-                    <button className="btn" onClick={() => confirm("Leave this workspace?") && run(async () => (await api.removeMember(m.id), (location.href = "/")), "Left.")}>
+                    <button className="btn" onClick={async () => (await confirmDialog("Leave this workspace?", { confirmLabel: "Leave", danger: true })) && run(async () => (await api.removeMember(m.id), (location.href = "/")), "Left.")}>
                       Leave
                     </button>
                   ) : (
                     admin &&
                     (m.role !== "owner" || owner) && (
-                      <button className="icon-btn danger" title="Remove" onClick={() => confirm(`Remove ${m.email}?`) && run(async () => (await api.removeMember(m.id), await load(), onChanged()), "Removed.")}>
+                      <button className="icon-btn danger" title="Remove" onClick={async () => (await confirmDialog(`Remove ${m.email}?`, { message: "They lose access to every board in this workspace.", confirmLabel: "Remove", danger: true })) && run(async () => (await api.removeMember(m.id), await load(), onChanged()), "Removed.")}>
                         <Trash2 size={14} />
                       </button>
                     )

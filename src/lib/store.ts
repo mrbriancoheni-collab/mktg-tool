@@ -102,6 +102,8 @@ interface State {
   redo(): void;
 
   addNode(type: string, position: { x: number; y: number }): string;
+  /** Adds a step after `fromId`, positions it to the right, and connects it. */
+  addNextStep(fromId: string, type: string): string;
   updateNode(id: string, patch: Partial<StageData>): void;
   updateEdge(id: string, patch: Partial<EdgeData>): void;
   addAsset(nodeId: string, asset: Asset): void;
@@ -248,6 +250,14 @@ export const useStore = create<State>()((set, get) => ({
           nodes: [...get().nodes.map((n) => ({ ...n, selected: false })), node],
           panel: item.kind === "note" ? get().panel : "inspector",
         });
+        return id;
+      },
+      addNextStep: (fromId, type) => {
+        const from = get().nodes.find((n) => n.id === fromId);
+        if (!from) return "";
+        const siblings = get().edges.filter((e) => e.source === fromId).length;
+        const id = get().addNode(type, { x: from.position.x + 320, y: from.position.y + siblings * 150 });
+        set({ edges: addEdge({ id: `e_${nanoid(6)}`, source: fromId, target: id, type: "flow", data: {} }, get().edges) });
         return id;
       },
       updateNode: (id, patch) =>

@@ -19,6 +19,7 @@ import { broadcast, closeRoom, subscribe } from "./realtime";
 import { buildReport, detectAnomalies, sendReport } from "./reports";
 import * as store from "./store";
 import { assertAiQuota, meter } from "./usage";
+import { activationFunnel, recordEvents } from "./analytics";
 
 const appUrl = (req: Request) => process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
 
@@ -109,6 +110,17 @@ export function createApp() {
     Sentry.captureMessage(`Client error: ${String(message).slice(0, 300)}`, { level: "error", extra: { stack: String(stack ?? "").slice(0, 4000), url } });
     res.json({ ok: true });
   });
+
+  app.post("/api/events", rateLimit("events", 120, 60_000), wrap(async (req) => {
+    await recordEvents(req, Array.isArray(req.body?.events) ? req.body.events : []);
+    return { ok: true };
+  }));
+  // Internal analytics for operators: set ADMIN_EMAILS (comma-separated).
+  app.get("/api/admin/metrics", requireAuth, wrap(async (req) => {
+    const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (!admins.includes(req.auth!.user.email)) throw new HttpError(403, "Admins only.");
+    return activationFunnel(Number(req.query.days ?? 30));
+  }));
 
   // Share links: view + comment without an account.
   app.get("/api/shared/:token", wrap(async (req) => {
