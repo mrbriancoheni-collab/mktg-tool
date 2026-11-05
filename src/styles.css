@@ -198,7 +198,7 @@ code { background: #f1f2f6; padding: 1px 4px; border-radius: 4px; font-size: 12p
 .side.open { width: 380px; }
 .side:not(.open) { width: 290px; }
 .side:not(.open) .side-body { display: none; }
-.side:not(.open) { width: auto; border-left: none; background: transparent; position: absolute; right: 12px; top: 66px; z-index: 6; }
+.side:not(.open) { width: auto; border-left: none; background: transparent; position: absolute; right: 12px; top: 128px; z-index: 6; }
 .side:not(.open) .tabs { border: 1px solid var(--line); border-radius: 10px; background: white; box-shadow: var(--shadow); }
 .tabs { display: flex; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); align-items: center; }
 .tab { display: flex; align-items: center; gap: 5px; border: none; background: transparent; padding: 6px 10px; border-radius: 7px; color: var(--muted); font-weight: 500; }
