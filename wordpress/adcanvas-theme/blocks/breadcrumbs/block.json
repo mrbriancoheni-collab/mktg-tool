@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "adcanvas/breadcrumbs",
+  "title": "Breadcrumbs",
+  "category": "theme",
+  "icon": "arrow-right-alt2",
+  "description": "Home › Section › Page trail for the current page. Also published as BreadcrumbList structured data.",
+  "textdomain": "adcanvas",
+  "supports": { "html": false, "align": ["wide"], "spacing": { "margin": true }, "typography": { "fontSize": true } },
+  "editorScript": "adcanvas-editor",
+  "render": "file:./render.php"
+}

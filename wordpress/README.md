@@ -6,6 +6,7 @@ The public website, at `yourdomain.com`, runs on WordPress with the **AdCanvas b
 |---|---|
 | `adcanvas-theme/` | Block (full-site-editing) theme: templates, patterns, styles, fonts, screenshots |
 | `adcanvas-starter-content.xml` | Import file with every page (Home, Features, Pricing, Templates, Blog, About, Contact, Security, Legal and its 7 sub-pages) and 3 starter blog posts |
+| `SEO-GUIDE.md` | What the theme does for search and AI-answer visibility, one-time setup, and the writing checklist for every post |
 | `tools/build-starter-content.mjs` | Regenerates the import file from `legal/*.md` (`npm run wp:content`) |
 
 ## Install
@@ -26,7 +27,7 @@ Then, in the app's environment, set `MARKETING_URL=https://yourdomain.com` (see 
 - **Fill in placeholders:** `[COMPANY LEGAL NAME]` in the footer (Appearance → Editor → Patterns → Footer), plus the About, Contact and Security pages.
 - **Legal pages** are imported from the templates in `legal/*.md`. Fill in the placeholders and have them reviewed by counsel. Either edit them in WordPress, or edit the markdown, run `npm run wp:content`, and re-import.
 - **Pricing** is copied from `shared/plans.ts`. If prices change, update `adcanvas-theme/patterns/pricing.php`, or edit the Pricing page in WordPress.
-- Install an SEO plugin (Yoast, Rank Math, etc.) if you want sitemaps and per-page meta. The theme's own Open Graph tags turn off automatically when one is active.
+- Work through the one-time setup in [`SEO-GUIDE.md`](SEO-GUIDE.md): permalinks, tagline, site icon, social profiles, author bios, Search Console and Bing Webmaster Tools. No SEO plugin is needed; if you add one, the theme's overlapping features switch off.
 - Add a cookie banner if you add analytics or ad pixels to the marketing site (see `legal/cookies.md`).
 
 ## Editing

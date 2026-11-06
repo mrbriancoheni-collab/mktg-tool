@@ -236,12 +236,18 @@ describe("marketing site", () => {
   test("MARKETING_URL is exposed in status and legal pages redirect to it", async () => {
     delete process.env.MARKETING_URL;
     assert.equal((await (await fetch(base + "/api/status")).json()).marketingUrl, null);
+    assert.equal((await fetch(base + "/robots.txt")).headers.get("x-robots-tag"), null);
+    assert.equal((await fetch(base + "/?share=abc")).headers.get("x-robots-tag"), "noindex, nofollow");
     process.env.MARKETING_URL = "https://adcanvas.example/";
     try {
       assert.equal((await (await fetch(base + "/api/status")).json()).marketingUrl, "https://adcanvas.example");
       const r = await fetch(base + "/legal/privacy", { redirect: "manual" });
       assert.equal(r.status, 302);
       assert.equal(r.headers.get("location"), "https://adcanvas.example/legal/privacy/");
+      // The app stays out of search results and points crawlers at the marketing site.
+      const robots = await fetch(base + "/robots.txt");
+      assert.equal(robots.headers.get("x-robots-tag"), "noindex, nofollow");
+      assert.match(await robots.text(), /Sitemap: https:\/\/adcanvas\.example\/wp-sitemap\.xml/);
     } finally {
       delete process.env.MARKETING_URL;
     }

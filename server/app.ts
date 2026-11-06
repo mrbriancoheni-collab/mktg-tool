@@ -83,6 +83,10 @@ function securityHeaders(req: Request, res: Response, next: NextFunction) {
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
   if (req.secure || (process.env.APP_URL ?? "").startsWith("https://")) res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
+  // Keep the app out of search results: with a marketing site, that site is what should rank;
+  // share links, reports and account pages are never meant to be indexed.
+  if (marketingUrl() || req.query.share || /^\/(api|admin|report|invite|reset|login|signup|forgot)\b/.test(req.path))
+    res.setHeader("x-robots-tag", "noindex, nofollow");
   if (process.env.NODE_ENV === "production" && !req.path.startsWith("/api"))
     res.setHeader(
       "content-security-policy",
@@ -458,6 +462,12 @@ export function createApp() {
   }));
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "Not found")));
+
+  // Crawlers may fetch pages (to see the noindex header) but are pointed at the marketing site.
+  app.get("/robots.txt", (_req, res) => {
+    const site = marketingUrl();
+    res.type("text/plain").send(`User-agent: *\nAllow: /\n${site ? `\n# The public site is ${site}\nSitemap: ${site}/wp-sitemap.xml\n` : ""}`);
+  });
 
   // Legal pages live on the marketing site when there is one.
   app.get(/^\/legal\/([a-z-]+)\/?$/, (req, res, next) => {

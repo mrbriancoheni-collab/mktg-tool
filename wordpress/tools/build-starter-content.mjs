@@ -101,11 +101,11 @@ const items = [];
 let id = 100;
 const add = (o) => { const item = { id: ++id, parent: 0, order: 0, template: "", type: "page", ...o }; items.push(item); return item; };
 
-add({ slug: "home", title: "Home", content: "<!-- wp:paragraph -->\n<p>This page is the front page. Its layout lives in the theme’s Front Page template — edit it under Appearance → Editor → Templates → Front Page.</p>\n<!-- /wp:paragraph -->", order: 1 });
+add({ slug: "home", title: "Home", excerpt: "AdCanvas is the AI canvas for ad campaigns: map the funnel, forecast results, write the ads, connect live data and see what to fix next. Free to start.", content: "<!-- wp:paragraph -->\n<p>This page is the front page. Its layout lives in the theme’s Front Page template — edit it under Appearance → Editor → Templates → Front Page.</p>\n<!-- /wp:paragraph -->", order: 1 });
 add({ slug: "features", title: "Features", template: "page-landing", order: 2, excerpt: "Plan, create, measure and improve ad campaigns on one AI canvas.",
-  content: [pageHeader("Features", "Everything your campaigns need, on one canvas", "Plan the funnel, forecast results, write the ads, connect live data and find the next thing to fix — without switching tools."), pattern("features-grid"), pattern("showcase"), pattern("how-it-works"), pattern("use-cases"), pattern("cta")].join("\n\n") });
+  content: [pageHeader("Features", "Everything your campaigns need, on one canvas", "Plan the funnel, forecast results, write the ads, connect live data and find the next thing to fix — without switching tools."), pattern("features-grid"), pattern("showcase"), pattern("how-it-works"), pattern("use-cases"), pattern("comparison"), pattern("cta")].join("\n\n") });
 add({ slug: "pricing", title: "Pricing", template: "page-landing", order: 3, excerpt: "Start free. Pro is $49 and Team is $149 per workspace per month.",
-  content: [pattern("pricing"), pattern("faq"), pattern("cta")].join("\n\n") });
+  content: [pageHeader("Pricing", "AdCanvas pricing", "Free for your first campaigns. Pro is $49 and Team is $149 per workspace per month, billed monthly — change or cancel any time."), pattern("pricing"), pattern("comparison"), pattern("faq"), pattern("cta")].join("\n\n") });
 add({ slug: "templates", title: "Funnel templates", template: "page-landing", order: 4, excerpt: "Ten proven B2B and B2C funnel templates with budgets and benchmarks.",
   content: [pageHeader("Templates", "Start from a proven funnel", "Ten B2B and B2C templates with channels, budgets and conversion benchmarks filled in. Open one, adjust it to your numbers and let AI do the rest."), pattern("templates-gallery"), pattern("cta")].join("\n\n") });
 add({ slug: "blog", title: "Blog", order: 5, content: "" });
@@ -166,95 +166,171 @@ LEGAL.forEach(([slug, fallback], i) => {
   add({ slug, title: title || fallback, template: "page-legal", parent: legalParent.id, order: i + 1, content: html });
 });
 
+// Blog posts are written answer-first for search and AI answer engines: the opening
+// paragraph answers the title, "Key takeaways" summarises, H2s are the questions people
+// ask, and the FAQ is published as FAQPage structured data by the theme.
 const POSTS = [
-  { slug: "map-a-full-funnel-ad-campaign", title: "How to map a full-funnel ad campaign before you spend a dollar", cat: "Planning", date: "2026-10-12 09:00:00",
-    excerpt: "Traffic sources, landing pages, follow-ups and the numbers that connect them — a practical walkthrough.",
+  {
+    slug: "map-a-full-funnel-ad-campaign",
+    title: "How to map a full-funnel ad campaign before you spend a dollar",
+    cat: "Planning",
+    tags: ["Funnel planning", "Forecasting", "Campaign strategy"],
+    date: "2026-10-12 09:00:00",
+    excerpt: "Map the outcome, the traffic sources, the path between them and a conversion rate on every step — then multiply through to see if the budget pays back.",
+    takeaways: [
+      "A funnel map connects every traffic source to the outcome you pay for, with a cost and a conversion rate on each step.",
+      "Multiply through before launch: visitors × conversion rates × order value shows whether the budget can pay back.",
+      "Plan what happens to people who don't convert — that's where retargeting and follow-up belong.",
+      "Replace benchmarks with live data step by step once the campaign runs.",
+    ],
+    intro: "To map a full-funnel ad campaign, start from the outcome you pay for, list every traffic source with its budget and cost per click, draw the path each visitor takes to that outcome, and put a conversion rate on every step. Multiplying through shows whether the plan can pay back before you spend anything.",
     md: `
-Most campaigns fail quietly. Not because the ads were bad, but because nobody wrote down how a click was supposed to become a customer. Mapping the funnel first fixes that.
+## What is a full-funnel campaign map?
 
-## 1. Start from the outcome
+A full-funnel campaign map is a diagram of every step between a first ad impression and a paying customer: traffic sources, landing pages, forms or checkouts, and follow-ups such as email or sales calls. Each step carries a budget or a conversion rate, so the map doubles as a forecast.
 
-Write down the one number that matters — purchases, demos booked, trials started — and what it's worth to you. Everything on the map should lead there.
+## Step 1: Start from the outcome
 
-## 2. Add the traffic sources
+Write down the one number that matters — purchases, demos booked or trials started — and what it's worth to you. Everything on the map should lead there.
 
-List every channel that will send people in: paid social, search, display, email, partners. For each one, note the budget and the expected cost per click. This is where most of your spend sits, so be honest about the numbers.
+## Step 2: Add the traffic sources
 
-## 3. Draw the path
+List every channel that will send people in: paid social, search, display, email and partners. For each, note the budget and the expected cost per click. This is where most of the spend sits, so be conservative.
 
-Connect each source to where it lands — a product page, a landing page, a lead form — and on to the next step. Ask at every step: *what happens to the people who don't convert here?* That's where retargeting and follow-up emails belong.
+## Step 3: Draw the path, including the drop-offs
 
-## 4. Put a conversion rate on every arrow
+Connect each source to where it lands, and on to the next step. At every step ask what happens to the people who *don't* convert. That's where retargeting ads and follow-up emails belong.
 
-You won't know the real numbers yet. Use benchmarks, then multiply through: 10,000 visitors × 3% to lead × 20% to customer = 60 customers. If the result doesn't pay for the budget, you've learned that for free.
+## Step 4: Put a conversion rate on every arrow
 
-## 5. Replace guesses with data
+Use benchmarks until you have your own data, then multiply through. For example, 10,000 visitors × 3% to lead × 20% to customer = 60 customers. At $150 average order value that's $9,000 in revenue; against a $6,000 budget, a ROAS of 1.5.
 
-Once the campaign is live, connect your ad and analytics accounts so real numbers replace the forecast, step by step. The weakest step is usually obvious within a week.
+| Step | Volume | Rate to next step |
+|---|---|---|
+| Visitors | 10,000 | 3% |
+| Leads | 300 | 20% |
+| Customers | 60 | — |
 
-> **Tip:** In AdCanvas, AI Build does steps 2–4 from a one-paragraph brief, and the forecast updates as you change anything on the canvas.
-` },
-  { slug: "ad-copy-that-fits-every-platform", title: "Writing ad copy that fits every platform’s limits", cat: "Creative", date: "2026-10-19 09:00:00",
-    excerpt: "Headlines, descriptions and primary text for Google, Meta, LinkedIn and TikTok — with the limits that matter.",
+If the result doesn't cover the budget, you've learned that for free.
+
+## Step 5: Replace guesses with live data
+
+Once the campaign runs, connect your ad and analytics accounts so real numbers replace the forecast. The weakest step is usually obvious within a week — that's your first experiment.
+
+Want a head start? Begin from one of the [funnel templates](/templates/) and adjust the numbers.
+`,
+    faq: [
+      ["What conversion rate should I assume for a landing page?", "Use your own historical rate if you have one. Otherwise start with a cautious benchmark for your industry and traffic source, and treat it as a placeholder: cold paid-social traffic usually converts lower than branded search. Replace it with real data after the first week."],
+      ["How detailed should a funnel map be?", "Detailed enough that every dollar of budget and every conversion step is visible, and no more. Most campaigns fit on one screen: three to six traffic sources, one or two landing pages, the conversion step and two or three follow-ups."],
+      ["Should I map retargeting separately?", "No. Draw retargeting as its own traffic source that points back into the same funnel, fed by the people who dropped off. That keeps its budget and its contribution visible next to the channels that feed it."],
+    ],
+  },
+  {
+    slug: "ad-copy-that-fits-every-platform",
+    title: "Writing ad copy that fits every platform’s limits",
+    cat: "Creative",
+    tags: ["Ad copy", "Google Ads", "Meta ads", "LinkedIn ads", "TikTok ads"],
+    date: "2026-10-19 09:00:00",
+    excerpt: "Google headlines are 30 characters and descriptions 90; Meta truncates primary text around 125. Write the full message first, then cut it down for each placement.",
+    takeaways: [
+      "Google responsive search ads allow 30-character headlines and 90-character descriptions.",
+      "Meta and LinkedIn truncate the main text after roughly 125–150 characters, so lead with the point.",
+      "Write the long version first, then cut it for each placement.",
+      "Give every headline its own job, because platforms recombine them.",
+    ],
+    intro: "To fit ad copy to every platform, write the full message once — who it's for, the outcome and the proof — then cut it to each placement's limit: 30 characters for Google headlines, 90 for Google descriptions, and roughly the first 125 characters of Meta's primary text before it's truncated.",
     md: `
-Every platform truncates differently. Copy that reads well on Meta gets cut mid-word on Google. Here are the limits worth memorizing, and how to write within them.
-
-## The limits that matter
+## What are the character limits for each ad platform?
 
 | Platform | Field | Limit |
 |---|---|---|
 | Google responsive search ads | Headline | 30 characters (up to 15) |
 | Google responsive search ads | Description | 90 characters (up to 4) |
-| Meta | Primary text | ~125 characters before "See more" |
+| Meta | Primary text | ~125 characters before “See more” |
 | Meta | Headline | ~40 characters before truncation |
-| LinkedIn | Intro text | ~150 characters before "See more" |
+| LinkedIn | Intro text | ~150 characters before “See more” |
 | TikTok | Ad text | 100 characters |
 
-Limits change; check each platform's current specs before you launch.
+Limits change; check each platform's current specifications before you launch.
 
-## Write the long version first
+## Why write the long version first?
 
-Start with the full message — who it's for, the outcome, and the proof. Then cut it down for each placement. It's much easier to shorten a clear idea than to stretch a slogan.
+It's much easier to shorten a clear idea than to stretch a slogan. The full version forces you to decide who the ad is for, what changes for them and why they should believe it. Each shorter version then keeps the part that matters most for that placement.
 
-## Make every headline stand alone
+## How do you write headlines that work in any order?
 
-Google mixes headlines in any order, so each one has to make sense by itself. Give each a different job: the benefit, the offer, the proof, the call to action.
+Google mixes headlines in any combination, so each one has to make sense alone. Give each a different job: the benefit, the offer, the proof and the call to action. Avoid headlines that only work as the second half of a sentence.
 
-## Match the step in the funnel
+## Should copy change by funnel stage?
 
-Cold audiences need the problem and the promise. Retargeting audiences already know you — give them the proof and a reason to act now.
-
-> **Tip:** AdCanvas writes ad packs for each step and flags anything over a platform's limit before you export or publish it as a paused draft.
-` },
-  { slug: "budget-pacing-catch-overspend", title: "Budget pacing: catch overspend before month end", cat: "Measurement", date: "2026-10-26 09:00:00",
-    excerpt: "A simple daily check that keeps campaigns on plan, and what to do when they drift.",
+Yes. Cold audiences need the problem and the promise. Retargeting audiences already know you — give them proof and a reason to act now. Map which ad serves which step before writing, so each version has one job. See [how to map a full-funnel campaign](/map-a-full-funnel-ad-campaign/).
+`,
+    faq: [
+      ["How many headlines should a Google responsive search ad have?", "Aim for at least 8 to 10 distinct headlines out of the 15 allowed, each under 30 characters. More variety gives Google more combinations to test, but only if the headlines say genuinely different things."],
+      ["Does Meta cut off long primary text?", "Yes. Meta shows roughly the first 125 characters in most feed placements and hides the rest behind “See more”. Put the hook and the offer in that first line; use the rest for detail and proof."],
+      ["Can I reuse the same copy on every platform?", "Reuse the message, not the wording. Each platform has different limits, formats and audience intent, so adapt the length and the opening line for each one."],
+    ],
+  },
+  {
+    slug: "budget-pacing-catch-overspend",
+    title: "Budget pacing: catch overspend before month end",
+    cat: "Measurement",
+    tags: ["Budget pacing", "Reporting", "Paid media"],
+    date: "2026-10-26 09:00:00",
+    excerpt: "Pacing = spend to date ÷ (budget × share of the month elapsed). Check it daily by channel and adjust budgets in 10–20% steps.",
+    takeaways: [
+      "Pacing is spend to date divided by the budget you'd expect to have spent by today.",
+      "Above about 110% you're on track to overspend; below about 90%, to underspend.",
+      "Check pacing by channel — one channel usually explains the gap.",
+      "Adjust daily budgets in small steps (10–20%) to avoid resetting learning phases.",
+    ],
+    intro: "Budget pacing compares what you've spent so far with what you should have spent by today. Divide spend to date by the monthly budget multiplied by the share of the month that has passed: $6,000 spent of a $10,000 budget on day 15 of 30 is 120% pacing, on track to spend about $12,000.",
     md: `
-A monthly budget that's spent by the 20th isn't a budget. Pacing tells you early whether you're on track, so you can adjust while it still matters.
+## How do you calculate budget pacing?
 
-## The basic check
+Pacing = spend to date ÷ (monthly budget × days elapsed ÷ days in month).
 
-Divide spend to date by the share of the month that has passed. If you've spent $6,000 of a $10,000 budget on day 15 of 30, you're pacing at 120% — on track to spend $12,000.
+With a $10,000 budget, on day 15 of a 30-day month you'd expect $5,000 spent. If you've spent $6,000, pacing is 120% and the projected month-end spend is about $12,000.
 
-## Why it drifts
+## Why do campaigns drift off pace?
 
-- **Auction changes.** Competitors raise bids, especially near holidays.
-- **Learning phases.** New campaigns often spend unevenly in the first days.
-- **Broad targeting.** Automated campaigns expand to find volume.
+- **Auction changes.** Competitors raise bids, especially around holidays.
+- **Learning phases.** New campaigns often spend unevenly in their first days.
+- **Broad or automated targeting.** Campaigns expand to find volume.
 
-## What to do about it
+## What should you do when a campaign overspends?
 
-1. Check pacing by channel, not just in total — one channel usually explains the gap.
-2. Look at cost per result alongside spend. Overspending at a good CPA can be an opportunity, not a problem.
-3. Adjust daily budgets in small steps (10–20%) to avoid resetting learning.
+1. Check pacing by channel, not just the total — one channel usually explains the gap.
+2. Look at cost per result alongside spend. Overspending at a good CPA can be an opportunity rather than a problem.
+3. Adjust daily budgets in small steps (10–20%) so you don't reset learning.
 
-## Automate the alert
+## How do you automate pacing alerts?
 
-Nobody remembers to check every day. Set an alert for when pacing passes a threshold, say 110%, and review then.
-
-> **Tip:** The AdCanvas dashboard shows budget pacing against your plan, and scheduled alerts can post to Slack when a channel drifts.
-` },
+Set an alert when pacing passes a threshold, such as 110% or 90%, and review then rather than checking every day. In AdCanvas, the dashboard shows pacing against your plan and [scheduled alerts](/features/) can post to Slack when a channel drifts.
+`,
+    faq: [
+      ["What is a good budget pacing percentage?", "Between about 90% and 110% is usually on track. Outside that range, check which channel is driving the difference and whether its cost per result justifies the change before adjusting budgets."],
+      ["How often should I check budget pacing?", "Daily for active campaigns, ideally through an automatic alert rather than a manual check. Weekly is enough for small, stable budgets."],
+      ["Should I pause a campaign that is overspending?", "Usually not. Lower its daily budget in 10–20% steps instead; pausing and restarting can reset the platform's learning and make delivery even less predictable."],
+    ],
+  },
 ];
-for (const p of POSTS) add({ type: "post", slug: p.slug, title: p.title, content: toBlocks(p.md, { dropTitle: false }).html, excerpt: p.excerpt, cat: p.cat, date: p.date });
+const takeawaysBlock = (items) => `<!-- wp:group {"className":"adcanvas-takeaways","style":{"spacing":{"blockGap":"var:preset|spacing|20"}},"layout":{"type":"default"}} -->
+<div class="wp-block-group adcanvas-takeaways"><!-- wp:heading {"fontSize":"large"} -->
+<h2 class="wp-block-heading has-large-font-size">Key takeaways</h2>
+<!-- /wp:heading -->
+
+${block("list", null, `<ul class="wp-block-list">${items.map((t) => block("list-item", null, `<li>${inline(t)}</li>`)).join("\n\n")}</ul>`)}</div>
+<!-- /wp:group -->`;
+const faqBlocks = (faq) => [
+  block("heading", null, `<h2 class="wp-block-heading">Frequently asked questions</h2>`),
+  ...faq.map(([q, a]) => `<!-- wp:details -->\n<details class="wp-block-details"><summary>${esc(q)}</summary>${block("paragraph", null, `<p>${inline(a)}</p>`)}</details>\n<!-- /wp:details -->`),
+].join("\n\n");
+for (const p of POSTS)
+  add({
+    type: "post", slug: p.slug, title: p.title, excerpt: p.excerpt, cat: p.cat, tags: p.tags, date: p.date,
+    content: [block("paragraph", null, `<p>${inline(p.intro)}</p>`), takeawaysBlock(p.takeaways), toBlocks(p.md, { dropTitle: false }).html, faqBlocks(p.faq)].join("\n\n"),
+  });
 
 /* ── WXR ───────────────────────────────────────────────────────────────── */
 const cdata = (s) => `<![CDATA[${String(s).replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
@@ -294,7 +370,8 @@ ${items.map((it) => `  <item>
     <wp:post_type>${cdata(it.type)}</wp:post_type>
     <wp:post_password>${cdata("")}</wp:post_password>
     <wp:is_sticky>0</wp:is_sticky>${it.cat ? `
-    <category domain="category" nicename="${catSlug(it.cat)}">${cdata(it.cat)}</category>` : ""}${it.template ? `
+    <category domain="category" nicename="${catSlug(it.cat)}">${cdata(it.cat)}</category>` : ""}${(it.tags || []).map((t) => `
+    <category domain="post_tag" nicename="${catSlug(t)}">${cdata(t)}</category>`).join("")}${it.template ? `
     <wp:postmeta><wp:meta_key>${cdata("_wp_page_template")}</wp:meta_key><wp:meta_value>${cdata(it.template)}</wp:meta_value></wp:postmeta>` : ""}
   </item>`).join("\n")}
 </channel>

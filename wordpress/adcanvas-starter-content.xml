@@ -22,7 +22,7 @@
     <content:encoded><![CDATA[<!-- wp:paragraph -->
 <p>This page is the front page. Its layout lives in the theme’s Front Page template — edit it under Appearance → Editor → Templates → Front Page.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
-    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    <excerpt:encoded><![CDATA[AdCanvas is the AI canvas for ad campaigns: map the funnel, forecast results, write the ads, connect live data and see what to fix next. Free to start.]]></excerpt:encoded>
     <wp:post_id>101</wp:post_id>
     <wp:post_date><![CDATA[2026-11-01 09:00:00]]></wp:post_date>
     <wp:post_date_gmt><![CDATA[2026-11-01 09:00:00]]></wp:post_date_gmt>
@@ -64,6 +64,8 @@
 
 <!-- wp:pattern {"slug":"adcanvas/use-cases"} /-->
 
+<!-- wp:pattern {"slug":"adcanvas/comparison"} /-->
+
 <!-- wp:pattern {"slug":"adcanvas/cta"} /-->]]></content:encoded>
     <excerpt:encoded><![CDATA[Plan, create, measure and improve ad campaigns on one AI canvas.]]></excerpt:encoded>
     <wp:post_id>102</wp:post_id>
@@ -86,7 +88,23 @@
     <dc:creator><![CDATA[admin]]></dc:creator>
     <guid isPermaLink="false">https://example.com/?page_id=103</guid>
     <description></description>
-    <content:encoded><![CDATA[<!-- wp:pattern {"slug":"adcanvas/pricing"} /-->
+    <content:encoded><![CDATA[<!-- wp:group {"tagName":"section","align":"full","className":"adcanvas-hero","style":{"spacing":{"padding":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|40"},"blockGap":"var:preset|spacing|30"}},"layout":{"type":"constrained","contentSize":"760px"}} -->
+<section class="wp-block-group alignfull adcanvas-hero" style="padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--40)"><!-- wp:paragraph {"align":"center","className":"is-style-eyebrow"} -->
+<p class="has-text-align-center is-style-eyebrow">Pricing</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {"textAlign":"center","level":1,"fontSize":"xx-large"} -->
+<h1 class="wp-block-heading has-text-align-center has-xx-large-font-size">AdCanvas pricing</h1>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph {"align":"center","textColor":"muted","fontSize":"large"} -->
+<p class="has-text-align-center has-muted-color has-text-color has-large-font-size">Free for your first campaigns. Pro is $49 and Team is $149 per workspace per month, billed monthly — change or cancel any time.</p>
+<!-- /wp:paragraph --></section>
+<!-- /wp:group -->
+
+<!-- wp:pattern {"slug":"adcanvas/pricing"} /-->
+
+<!-- wp:pattern {"slug":"adcanvas/comparison"} /-->
 
 <!-- wp:pattern {"slug":"adcanvas/faq"} /-->
 
@@ -1249,55 +1267,115 @@
     <guid isPermaLink="false">https://example.com/?p=117</guid>
     <description></description>
     <content:encoded><![CDATA[<!-- wp:paragraph -->
-<p>Most campaigns fail quietly. Not because the ads were bad, but because nobody wrote down how a click was supposed to become a customer. Mapping the funnel first fixes that.</p>
+<p>To map a full-funnel ad campaign, start from the outcome you pay for, list every traffic source with its budget and cost per click, draw the path each visitor takes to that outcome, and put a conversion rate on every step. Multiplying through shows whether the plan can pay back before you spend anything.</p>
 <!-- /wp:paragraph -->
 
+<!-- wp:group {"className":"adcanvas-takeaways","style":{"spacing":{"blockGap":"var:preset|spacing|20"}},"layout":{"type":"default"}} -->
+<div class="wp-block-group adcanvas-takeaways"><!-- wp:heading {"fontSize":"large"} -->
+<h2 class="wp-block-heading has-large-font-size">Key takeaways</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>A funnel map connects every traffic source to the outcome you pay for, with a cost and a conversion rate on each step.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Multiply through before launch: visitors × conversion rates × order value shows whether the budget can pay back.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Plan what happens to people who don&#39;t convert — that&#39;s where retargeting and follow-up belong.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Replace benchmarks with live data step by step once the campaign runs.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list --></div>
+<!-- /wp:group -->
+
 <!-- wp:heading -->
-<h2 class="wp-block-heading">1. Start from the outcome</h2>
+<h2 class="wp-block-heading">What is a full-funnel campaign map?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Write down the one number that matters — purchases, demos booked, trials started — and what it&#39;s worth to you. Everything on the map should lead there.</p>
+<p>A full-funnel campaign map is a diagram of every step between a first ad impression and a paying customer: traffic sources, landing pages, forms or checkouts, and follow-ups such as email or sales calls. Each step carries a budget or a conversion rate, so the map doubles as a forecast.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">2. Add the traffic sources</h2>
+<h2 class="wp-block-heading">Step 1: Start from the outcome</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>List every channel that will send people in: paid social, search, display, email, partners. For each one, note the budget and the expected cost per click. This is where most of your spend sits, so be honest about the numbers.</p>
+<p>Write down the one number that matters — purchases, demos booked or trials started — and what it&#39;s worth to you. Everything on the map should lead there.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">3. Draw the path</h2>
+<h2 class="wp-block-heading">Step 2: Add the traffic sources</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Connect each source to where it lands — a product page, a landing page, a lead form — and on to the next step. Ask at every step: <em>what happens to the people who don&#39;t convert here?</em> That&#39;s where retargeting and follow-up emails belong.</p>
+<p>List every channel that will send people in: paid social, search, display, email and partners. For each, note the budget and the expected cost per click. This is where most of the spend sits, so be conservative.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">4. Put a conversion rate on every arrow</h2>
+<h2 class="wp-block-heading">Step 3: Draw the path, including the drop-offs</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>You won&#39;t know the real numbers yet. Use benchmarks, then multiply through: 10,000 visitors × 3% to lead × 20% to customer = 60 customers. If the result doesn&#39;t pay for the budget, you&#39;ve learned that for free.</p>
+<p>Connect each source to where it lands, and on to the next step. At every step ask what happens to the people who <em>don&#39;t</em> convert. That&#39;s where retargeting ads and follow-up emails belong.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">5. Replace guesses with data</h2>
+<h2 class="wp-block-heading">Step 4: Put a conversion rate on every arrow</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Once the campaign is live, connect your ad and analytics accounts so real numbers replace the forecast, step by step. The weakest step is usually obvious within a week.</p>
+<p>Use benchmarks until you have your own data, then multiply through. For example, 10,000 visitors × 3% to lead × 20% to customer = 60 customers. At $150 average order value that&#39;s $9,000 in revenue; against a $6,000 budget, a ROAS of 1.5.</p>
 <!-- /wp:paragraph -->
 
-<!-- wp:quote -->
-<blockquote class="wp-block-quote"><!-- wp:paragraph -->
-<p><strong>Tip:</strong> In AdCanvas, AI Build does steps 2–4 from a one-paragraph brief, and the forecast updates as you change anything on the canvas.</p>
-<!-- /wp:paragraph --></blockquote>
-<!-- /wp:quote -->]]></content:encoded>
-    <excerpt:encoded><![CDATA[Traffic sources, landing pages, follow-ups and the numbers that connect them — a practical walkthrough.]]></excerpt:encoded>
+<!-- wp:table -->
+<figure class="wp-block-table"><table class="has-fixed-layout"><thead><tr><th>Step</th><th>Volume</th><th>Rate to next step</th></tr></thead><tbody><tr><td>Visitors</td><td>10,000</td><td>3%</td></tr><tr><td>Leads</td><td>300</td><td>20%</td></tr><tr><td>Customers</td><td>60</td><td>—</td></tr></tbody></table></figure>
+<!-- /wp:table -->
+
+<!-- wp:paragraph -->
+<p>If the result doesn&#39;t cover the budget, you&#39;ve learned that for free.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Step 5: Replace guesses with live data</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Once the campaign runs, connect your ad and analytics accounts so real numbers replace the forecast. The weakest step is usually obvious within a week — that&#39;s your first experiment.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>Want a head start? Begin from one of the <a href="/templates/">funnel templates</a> and adjust the numbers.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Frequently asked questions</h2>
+<!-- /wp:heading -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>What conversion rate should I assume for a landing page?</summary><!-- wp:paragraph -->
+<p>Use your own historical rate if you have one. Otherwise start with a cautious benchmark for your industry and traffic source, and treat it as a placeholder: cold paid-social traffic usually converts lower than branded search. Replace it with real data after the first week.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>How detailed should a funnel map be?</summary><!-- wp:paragraph -->
+<p>Detailed enough that every dollar of budget and every conversion step is visible, and no more. Most campaigns fit on one screen: three to six traffic sources, one or two landing pages, the conversion step and two or three follow-ups.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>Should I map retargeting separately?</summary><!-- wp:paragraph -->
+<p>No. Draw retargeting as its own traffic source that points back into the same funnel, fed by the people who dropped off. That keeps its budget and its contribution visible next to the channels that feed it.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->]]></content:encoded>
+    <excerpt:encoded><![CDATA[Map the outcome, the traffic sources, the path between them and a conversion rate on every step — then multiply through to see if the budget pays back.]]></excerpt:encoded>
     <wp:post_id>117</wp:post_id>
     <wp:post_date><![CDATA[2026-10-12 09:00:00]]></wp:post_date>
     <wp:post_date_gmt><![CDATA[2026-10-12 09:00:00]]></wp:post_date_gmt>
@@ -1311,6 +1389,9 @@
     <wp:post_password><![CDATA[]]></wp:post_password>
     <wp:is_sticky>0</wp:is_sticky>
     <category domain="category" nicename="planning"><![CDATA[Planning]]></category>
+    <category domain="post_tag" nicename="funnel-planning"><![CDATA[Funnel planning]]></category>
+    <category domain="post_tag" nicename="forecasting"><![CDATA[Forecasting]]></category>
+    <category domain="post_tag" nicename="campaign-strategy"><![CDATA[Campaign strategy]]></category>
   </item>
   <item>
     <title><![CDATA[Writing ad copy that fits every platform’s limits]]></title>
@@ -1319,51 +1400,91 @@
     <guid isPermaLink="false">https://example.com/?p=118</guid>
     <description></description>
     <content:encoded><![CDATA[<!-- wp:paragraph -->
-<p>Every platform truncates differently. Copy that reads well on Meta gets cut mid-word on Google. Here are the limits worth memorizing, and how to write within them.</p>
+<p>To fit ad copy to every platform, write the full message once — who it&#39;s for, the outcome and the proof — then cut it to each placement&#39;s limit: 30 characters for Google headlines, 90 for Google descriptions, and roughly the first 125 characters of Meta&#39;s primary text before it&#39;s truncated.</p>
 <!-- /wp:paragraph -->
 
+<!-- wp:group {"className":"adcanvas-takeaways","style":{"spacing":{"blockGap":"var:preset|spacing|20"}},"layout":{"type":"default"}} -->
+<div class="wp-block-group adcanvas-takeaways"><!-- wp:heading {"fontSize":"large"} -->
+<h2 class="wp-block-heading has-large-font-size">Key takeaways</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>Google responsive search ads allow 30-character headlines and 90-character descriptions.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Meta and LinkedIn truncate the main text after roughly 125–150 characters, so lead with the point.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Write the long version first, then cut it for each placement.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Give every headline its own job, because platforms recombine them.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list --></div>
+<!-- /wp:group -->
+
 <!-- wp:heading -->
-<h2 class="wp-block-heading">The limits that matter</h2>
+<h2 class="wp-block-heading">What are the character limits for each ad platform?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:table -->
-<figure class="wp-block-table"><table class="has-fixed-layout"><thead><tr><th>Platform</th><th>Field</th><th>Limit</th></tr></thead><tbody><tr><td>Google responsive search ads</td><td>Headline</td><td>30 characters (up to 15)</td></tr><tr><td>Google responsive search ads</td><td>Description</td><td>90 characters (up to 4)</td></tr><tr><td>Meta</td><td>Primary text</td><td>~125 characters before &quot;See more&quot;</td></tr><tr><td>Meta</td><td>Headline</td><td>~40 characters before truncation</td></tr><tr><td>LinkedIn</td><td>Intro text</td><td>~150 characters before &quot;See more&quot;</td></tr><tr><td>TikTok</td><td>Ad text</td><td>100 characters</td></tr></tbody></table></figure>
+<figure class="wp-block-table"><table class="has-fixed-layout"><thead><tr><th>Platform</th><th>Field</th><th>Limit</th></tr></thead><tbody><tr><td>Google responsive search ads</td><td>Headline</td><td>30 characters (up to 15)</td></tr><tr><td>Google responsive search ads</td><td>Description</td><td>90 characters (up to 4)</td></tr><tr><td>Meta</td><td>Primary text</td><td>~125 characters before “See more”</td></tr><tr><td>Meta</td><td>Headline</td><td>~40 characters before truncation</td></tr><tr><td>LinkedIn</td><td>Intro text</td><td>~150 characters before “See more”</td></tr><tr><td>TikTok</td><td>Ad text</td><td>100 characters</td></tr></tbody></table></figure>
 <!-- /wp:table -->
 
 <!-- wp:paragraph -->
-<p>Limits change; check each platform&#39;s current specs before you launch.</p>
+<p>Limits change; check each platform&#39;s current specifications before you launch.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">Write the long version first</h2>
+<h2 class="wp-block-heading">Why write the long version first?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Start with the full message — who it&#39;s for, the outcome, and the proof. Then cut it down for each placement. It&#39;s much easier to shorten a clear idea than to stretch a slogan.</p>
+<p>It&#39;s much easier to shorten a clear idea than to stretch a slogan. The full version forces you to decide who the ad is for, what changes for them and why they should believe it. Each shorter version then keeps the part that matters most for that placement.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">Make every headline stand alone</h2>
+<h2 class="wp-block-heading">How do you write headlines that work in any order?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Google mixes headlines in any order, so each one has to make sense by itself. Give each a different job: the benefit, the offer, the proof, the call to action.</p>
+<p>Google mixes headlines in any combination, so each one has to make sense alone. Give each a different job: the benefit, the offer, the proof and the call to action. Avoid headlines that only work as the second half of a sentence.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">Match the step in the funnel</h2>
+<h2 class="wp-block-heading">Should copy change by funnel stage?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Cold audiences need the problem and the promise. Retargeting audiences already know you — give them the proof and a reason to act now.</p>
+<p>Yes. Cold audiences need the problem and the promise. Retargeting audiences already know you — give them proof and a reason to act now. Map which ad serves which step before writing, so each version has one job. See <a href="/map-a-full-funnel-ad-campaign/">how to map a full-funnel campaign</a>.</p>
 <!-- /wp:paragraph -->
 
-<!-- wp:quote -->
-<blockquote class="wp-block-quote"><!-- wp:paragraph -->
-<p><strong>Tip:</strong> AdCanvas writes ad packs for each step and flags anything over a platform&#39;s limit before you export or publish it as a paused draft.</p>
-<!-- /wp:paragraph --></blockquote>
-<!-- /wp:quote -->]]></content:encoded>
-    <excerpt:encoded><![CDATA[Headlines, descriptions and primary text for Google, Meta, LinkedIn and TikTok — with the limits that matter.]]></excerpt:encoded>
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Frequently asked questions</h2>
+<!-- /wp:heading -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>How many headlines should a Google responsive search ad have?</summary><!-- wp:paragraph -->
+<p>Aim for at least 8 to 10 distinct headlines out of the 15 allowed, each under 30 characters. More variety gives Google more combinations to test, but only if the headlines say genuinely different things.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>Does Meta cut off long primary text?</summary><!-- wp:paragraph -->
+<p>Yes. Meta shows roughly the first 125 characters in most feed placements and hides the rest behind “See more”. Put the hook and the offer in that first line; use the rest for detail and proof.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>Can I reuse the same copy on every platform?</summary><!-- wp:paragraph -->
+<p>Reuse the message, not the wording. Each platform has different limits, formats and audience intent, so adapt the length and the opening line for each one.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->]]></content:encoded>
+    <excerpt:encoded><![CDATA[Google headlines are 30 characters and descriptions 90; Meta truncates primary text around 125. Write the full message first, then cut it down for each placement.]]></excerpt:encoded>
     <wp:post_id>118</wp:post_id>
     <wp:post_date><![CDATA[2026-10-19 09:00:00]]></wp:post_date>
     <wp:post_date_gmt><![CDATA[2026-10-19 09:00:00]]></wp:post_date_gmt>
@@ -1377,6 +1498,11 @@
     <wp:post_password><![CDATA[]]></wp:post_password>
     <wp:is_sticky>0</wp:is_sticky>
     <category domain="category" nicename="creative"><![CDATA[Creative]]></category>
+    <category domain="post_tag" nicename="ad-copy"><![CDATA[Ad copy]]></category>
+    <category domain="post_tag" nicename="google-ads"><![CDATA[Google Ads]]></category>
+    <category domain="post_tag" nicename="meta-ads"><![CDATA[Meta ads]]></category>
+    <category domain="post_tag" nicename="linkedin-ads"><![CDATA[LinkedIn ads]]></category>
+    <category domain="post_tag" nicename="tiktok-ads"><![CDATA[TikTok ads]]></category>
   </item>
   <item>
     <title><![CDATA[Budget pacing: catch overspend before month end]]></title>
@@ -1385,67 +1511,111 @@
     <guid isPermaLink="false">https://example.com/?p=119</guid>
     <description></description>
     <content:encoded><![CDATA[<!-- wp:paragraph -->
-<p>A monthly budget that&#39;s spent by the 20th isn&#39;t a budget. Pacing tells you early whether you&#39;re on track, so you can adjust while it still matters.</p>
+<p>Budget pacing compares what you&#39;ve spent so far with what you should have spent by today. Divide spend to date by the monthly budget multiplied by the share of the month that has passed: $6,000 spent of a $10,000 budget on day 15 of 30 is 120% pacing, on track to spend about $12,000.</p>
 <!-- /wp:paragraph -->
 
-<!-- wp:heading -->
-<h2 class="wp-block-heading">The basic check</h2>
-<!-- /wp:heading -->
-
-<!-- wp:paragraph -->
-<p>Divide spend to date by the share of the month that has passed. If you&#39;ve spent $6,000 of a $10,000 budget on day 15 of 30, you&#39;re pacing at 120% — on track to spend $12,000.</p>
-<!-- /wp:paragraph -->
-
-<!-- wp:heading -->
-<h2 class="wp-block-heading">Why it drifts</h2>
+<!-- wp:group {"className":"adcanvas-takeaways","style":{"spacing":{"blockGap":"var:preset|spacing|20"}},"layout":{"type":"default"}} -->
+<div class="wp-block-group adcanvas-takeaways"><!-- wp:heading {"fontSize":"large"} -->
+<h2 class="wp-block-heading has-large-font-size">Key takeaways</h2>
 <!-- /wp:heading -->
 
 <!-- wp:list -->
 <ul class="wp-block-list"><!-- wp:list-item -->
-<li><strong>Auction changes.</strong> Competitors raise bids, especially near holidays.</li>
+<li>Pacing is spend to date divided by the budget you&#39;d expect to have spent by today.</li>
 <!-- /wp:list-item -->
 
 <!-- wp:list-item -->
-<li><strong>Learning phases.</strong> New campaigns often spend unevenly in the first days.</li>
+<li>Above about 110% you&#39;re on track to overspend; below about 90%, to underspend.</li>
 <!-- /wp:list-item -->
 
 <!-- wp:list-item -->
-<li><strong>Broad targeting.</strong> Automated campaigns expand to find volume.</li>
+<li>Check pacing by channel — one channel usually explains the gap.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Adjust daily budgets in small steps (10–20%) to avoid resetting learning phases.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list --></div>
+<!-- /wp:group -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">How do you calculate budget pacing?</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Pacing = spend to date ÷ (monthly budget × days elapsed ÷ days in month).</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>With a $10,000 budget, on day 15 of a 30-day month you&#39;d expect $5,000 spent. If you&#39;ve spent $6,000, pacing is 120% and the projected month-end spend is about $12,000.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Why do campaigns drift off pace?</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Auction changes.</strong> Competitors raise bids, especially around holidays.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Learning phases.</strong> New campaigns often spend unevenly in their first days.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Broad or automated targeting.</strong> Campaigns expand to find volume.</li>
 <!-- /wp:list-item --></ul>
 <!-- /wp:list -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">What to do about it</h2>
+<h2 class="wp-block-heading">What should you do when a campaign overspends?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:list {"ordered":true} -->
 <ol class="wp-block-list"><!-- wp:list-item -->
-<li>Check pacing by channel, not just in total — one channel usually explains the gap.</li>
+<li>Check pacing by channel, not just the total — one channel usually explains the gap.</li>
 <!-- /wp:list-item -->
 
 <!-- wp:list-item -->
-<li>Look at cost per result alongside spend. Overspending at a good CPA can be an opportunity, not a problem.</li>
+<li>Look at cost per result alongside spend. Overspending at a good CPA can be an opportunity rather than a problem.</li>
 <!-- /wp:list-item -->
 
 <!-- wp:list-item -->
-<li>Adjust daily budgets in small steps (10–20%) to avoid resetting learning.</li>
+<li>Adjust daily budgets in small steps (10–20%) so you don&#39;t reset learning.</li>
 <!-- /wp:list-item --></ol>
 <!-- /wp:list -->
 
 <!-- wp:heading -->
-<h2 class="wp-block-heading">Automate the alert</h2>
+<h2 class="wp-block-heading">How do you automate pacing alerts?</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Nobody remembers to check every day. Set an alert for when pacing passes a threshold, say 110%, and review then.</p>
+<p>Set an alert when pacing passes a threshold, such as 110% or 90%, and review then rather than checking every day. In AdCanvas, the dashboard shows pacing against your plan and <a href="/features/">scheduled alerts</a> can post to Slack when a channel drifts.</p>
 <!-- /wp:paragraph -->
 
-<!-- wp:quote -->
-<blockquote class="wp-block-quote"><!-- wp:paragraph -->
-<p><strong>Tip:</strong> The AdCanvas dashboard shows budget pacing against your plan, and scheduled alerts can post to Slack when a channel drifts.</p>
-<!-- /wp:paragraph --></blockquote>
-<!-- /wp:quote -->]]></content:encoded>
-    <excerpt:encoded><![CDATA[A simple daily check that keeps campaigns on plan, and what to do when they drift.]]></excerpt:encoded>
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Frequently asked questions</h2>
+<!-- /wp:heading -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>What is a good budget pacing percentage?</summary><!-- wp:paragraph -->
+<p>Between about 90% and 110% is usually on track. Outside that range, check which channel is driving the difference and whether its cost per result justifies the change before adjusting budgets.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>How often should I check budget pacing?</summary><!-- wp:paragraph -->
+<p>Daily for active campaigns, ideally through an automatic alert rather than a manual check. Weekly is enough for small, stable budgets.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>Should I pause a campaign that is overspending?</summary><!-- wp:paragraph -->
+<p>Usually not. Lower its daily budget in 10–20% steps instead; pausing and restarting can reset the platform&#39;s learning and make delivery even less predictable.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->]]></content:encoded>
+    <excerpt:encoded><![CDATA[Pacing = spend to date ÷ (budget × share of the month elapsed). Check it daily by channel and adjust budgets in 10–20% steps.]]></excerpt:encoded>
     <wp:post_id>119</wp:post_id>
     <wp:post_date><![CDATA[2026-10-26 09:00:00]]></wp:post_date>
     <wp:post_date_gmt><![CDATA[2026-10-26 09:00:00]]></wp:post_date_gmt>
@@ -1459,6 +1629,9 @@
     <wp:post_password><![CDATA[]]></wp:post_password>
     <wp:is_sticky>0</wp:is_sticky>
     <category domain="category" nicename="measurement"><![CDATA[Measurement]]></category>
+    <category domain="post_tag" nicename="budget-pacing"><![CDATA[Budget pacing]]></category>
+    <category domain="post_tag" nicename="reporting"><![CDATA[Reporting]]></category>
+    <category domain="post_tag" nicename="paid-media"><![CDATA[Paid media]]></category>
   </item>
 </channel>
 </rss>

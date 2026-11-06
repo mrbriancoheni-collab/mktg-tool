@@ -4,14 +4,16 @@
  *
  * - App URL setting (Settings → General): every link in the theme's patterns that
  *   points at https://app.example.com is rewritten to your real app subdomain.
- * - Pattern categories, block styles, reading time, social meta fallback.
+ * - Pattern categories, block styles, reading time.
+ * - Search & AI visibility (inc/): meta tags, JSON-LD, robots, llms.txt, IndexNow,
+ *   breadcrumbs and table-of-contents blocks.
  *
  * @package AdCanvas
  */
 
 defined( 'ABSPATH' ) || exit;
 
-const ADCANVAS_VERSION = '1.0.0';
+const ADCANVAS_VERSION = '1.1.0';
 /** Placeholder host used in patterns; replaced with the configured app URL at render time. */
 const ADCANVAS_APP_PLACEHOLDER = 'https://app.example.com';
 
@@ -36,6 +38,8 @@ add_action(
 		add_theme_support( 'editor-styles' );
 		add_theme_support( 'post-thumbnails' );
 		add_theme_support( 'responsive-embeds' );
+		add_theme_support( 'title-tag' );
+		add_theme_support( 'automatic-feed-links' );
 		add_editor_style( 'assets/css/theme.css' );
 	}
 );
@@ -153,44 +157,13 @@ add_filter(
 	3
 );
 
-/* ─────────────────────────── Social / SEO fallback ─────────────────────────── */
+/* ─────────────────────────── Search, AI answers, blocks ─────────────────────────── */
 
-/**
- * Basic Open Graph + Twitter tags when no SEO plugin is active
- * (Yoast, Rank Math, SEOPress, AIOSEO and The SEO Framework output their own).
- */
-add_action(
-	'wp_head',
-	function () {
-		if ( defined( 'WPSEO_VERSION' ) || defined( 'RANK_MATH_VERSION' ) || defined( 'SEOPRESS_VERSION' ) || defined( 'AIOSEO_VERSION' ) || defined( 'THE_SEO_FRAMEWORK_VERSION' ) ) {
-			return;
-		}
-		$title       = wp_get_document_title();
-		$description = is_singular() ? get_the_excerpt() : '';
-		if ( '' === trim( (string) $description ) ) {
-			$description = get_bloginfo( 'description' );
-		}
-		if ( is_front_page() ) {
-			$url = home_url( '/' );
-		} elseif ( is_singular() ) {
-			$url = get_permalink();
-		} else {
-			$url = get_pagenum_link( max( 1, (int) get_query_var( 'paged' ) ) );
-		}
-		$image       = is_singular() && has_post_thumbnail() ? get_the_post_thumbnail_url( null, 'large' ) : get_theme_file_uri( 'assets/images/social-card.png' );
-		$type        = is_singular( 'post' ) ? 'article' : 'website';
-
-		printf( '<meta name="description" content="%s">' . "\n", esc_attr( wp_trim_words( $description, 30 ) ) );
-		printf( '<meta property="og:type" content="%s">' . "\n", esc_attr( $type ) );
-		printf( '<meta property="og:title" content="%s">' . "\n", esc_attr( $title ) );
-		printf( '<meta property="og:description" content="%s">' . "\n", esc_attr( wp_trim_words( $description, 30 ) ) );
-		printf( '<meta property="og:url" content="%s">' . "\n", esc_url( $url ) );
-		printf( '<meta property="og:site_name" content="%s">' . "\n", esc_attr( get_bloginfo( 'name' ) ) );
-		printf( '<meta property="og:image" content="%s">' . "\n", esc_url( $image ) );
-		echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
-	},
-	5
-);
+require_once __DIR__ . '/inc/plans.php';
+require_once __DIR__ . '/inc/seo.php';
+require_once __DIR__ . '/inc/schema.php';
+require_once __DIR__ . '/inc/llms.php';
+require_once __DIR__ . '/inc/blocks.php';
 
 /* ─────────────────────────── Performance ─────────────────────────── */
 
