@@ -52,6 +52,8 @@ This runs 48 integration and unit tests against an in-memory Postgres. Set `DATA
 
 See **[docs/SETUP.md](docs/SETUP.md)** for every outside account, in order: hosting, Anthropic, email, Stripe, Sentry, Google, Meta, LinkedIn, TikTok, Shopify/HubSpot/Salesforce, Sign in with Google and analytics. On Render, use the included `render.yaml` blueprint. Any other host can use the `Dockerfile`.
 
+The marketing site and blog run on WordPress at your main domain, with the app on the `app.` subdomain. The block theme and starter content are in [`wordpress/`](wordpress/README.md).
+
 Before launch, run the **[usability test plan](docs/USABILITY-TEST-PLAN.md)** and work through **[LEGAL-CHECKLIST.md](LEGAL-CHECKLIST.md)**.
 
 ## Architecture
@@ -73,6 +75,7 @@ server/
 shared/              catalog, simulator, ops, optimizer & stats, templates, auto-match, AI edits
 tests/               API integration + unit tests
 docs/                setup guide, usability test plan, security policy templates
+wordpress/           block theme + starter content for the marketing site and blog
 legal/               Privacy, Terms, DPA, AUP, Subprocessors, Cookies, Data deletion (templates)
 ```
 

@@ -120,9 +120,19 @@ These attribute closed revenue to traffic sources, using UTMs (Shopify) or lead/
 - **Klaviyo, Mailchimp, Intercom, Zendesk and other tools** store credentials (encrypted) but don't sync data yet.
 - **Publishing to LinkedIn and TikTok:** ad packs can be exported for these platforms, but direct draft publishing exists only for Google Ads and Meta.
 
-## 9. Before you announce it
+## 12. Marketing site and blog: WordPress (1–2 hours)
 
-- [ ] Fill in the legal placeholders and get the lawyer review (see `LEGAL-CHECKLIST.md`).
+The public site (home, features, pricing, templates, blog, legal) runs on WordPress at your main domain, and the app runs on the `app.` subdomain.
+
+1. **DNS:** point `yourdomain.com` (and `www`) at your WordPress host, and `app.yourdomain.com` at the app (Render → Settings → Custom domains).
+2. **App:** set `APP_URL=https://app.yourdomain.com` and `MARKETING_URL=https://yourdomain.com`. The app then shows sign-in at its root, links its logo to the marketing site, and redirects `/legal/*` to the WordPress legal pages.
+3. **WordPress:** install the theme and import the starter content by following [`wordpress/README.md`](../wordpress/README.md). Set the app URL under Settings → General → *AdCanvas app URL* (it defaults to `https://app.` + your domain).
+4. **Google OAuth consent screen:** use the WordPress URLs for the homepage, privacy policy and terms (`https://yourdomain.com/legal/privacy/`, `/legal/terms/`).
+
+## 13. Before you announce it
+
+- [ ] Fill in the legal placeholders and get the lawyer review (see `LEGAL-CHECKLIST.md`). Then run `npm run wp:content` and re-import, or paste the changes into the WordPress legal pages.
+- [ ] Replace the placeholder testimonials, footer company name and About/Contact placeholders on the WordPress site.
 - [ ] Back up `ENCRYPTION_KEY`. Confirm daily database backups are on, and do a test restore.
 - [ ] Sign up as a new user on production. Run AI Build, invite a teammate, share a link, connect Slack and send a report.
 - [ ] Do the Stripe test-mode upgrade and downgrade, then switch to live keys.

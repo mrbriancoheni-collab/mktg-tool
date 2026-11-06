@@ -20,6 +20,8 @@ services:
         generateValue: true
       - key: APP_URL
         sync: false # e.g. https://app.yourdomain.com
+      - key: MARKETING_URL
+        sync: false # e.g. https://yourdomain.com (the WordPress site; see wordpress/README.md)
       - key: ANTHROPIC_API_KEY
         sync: false
       # Billing (optional — omit STRIPE_SECRET_KEY for an internal, unlimited deployment)

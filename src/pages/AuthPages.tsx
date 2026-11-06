@@ -22,9 +22,10 @@ export function AuthPage({ mode, token, onDone }: { mode: AuthMode; token?: stri
   const [info, setInfo] = useState("");
   const [invite, setInvite] = useState<{ workspace: string; inviter: string | null; email: string; role: string } | null>(null);
   const [googleLogin, setGoogleLogin] = useState(false);
+  const [site, setSite] = useState<string | null>(null);
   const [code, setCode] = useState("");
   useEffect(() => {
-    api.status().then((st) => setGoogleLogin(st.googleLogin)).catch(() => {});
+    api.status().then((st) => { setGoogleLogin(st.googleLogin); setSite(st.marketingUrl ?? null); }).catch(() => {});
     const err = new URLSearchParams(location.search).get("error");
     if (err) setError(err);
   }, []);
@@ -74,7 +75,7 @@ export function AuthPage({ mode, token, onDone }: { mode: AuthMode; token?: stri
 
   return (
     <div className="auth">
-      <a className="brand" href="/">
+      <a className="brand" href={site ?? "/"}>
         <span className="logo">◆</span> AdCanvas
       </a>
       <form className="auth-card" onSubmit={submit}>

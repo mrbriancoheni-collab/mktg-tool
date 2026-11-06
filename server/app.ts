@@ -25,6 +25,8 @@ import { activationFunnel, recordEvents } from "./analytics";
 import { adminsOf, autoSnapshot, featuresRouter, mentionedMembers, notifyUsers } from "./features";
 
 const appUrl = (req: Request) => process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
+/** Public marketing site (e.g. the WordPress site at https://yourdomain.com), when the app runs on its own subdomain. */
+export const marketingUrl = () => (process.env.MARKETING_URL ?? "").replace(/\/+$/, "") || null;
 
 type Handler = (req: Request, res: Response) => unknown;
 const wrap = (fn: Handler) => (req: Request, res: Response, next: NextFunction) =>
@@ -81,6 +83,10 @@ function securityHeaders(req: Request, res: Response, next: NextFunction) {
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
   if (req.secure || (process.env.APP_URL ?? "").startsWith("https://")) res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
+  // Keep the app out of search results: with a marketing site, that site is what should rank;
+  // share links, reports and account pages are never meant to be indexed.
+  if (marketingUrl() || req.query.share || /^\/(api|admin|report|invite|reset|login|signup|forgot)\b/.test(req.path))
+    res.setHeader("x-robots-tag", "noindex, nofollow");
   if (process.env.NODE_ENV === "production" && !req.path.startsWith("/api"))
     res.setHeader(
       "content-security-policy",
@@ -109,7 +115,7 @@ export function createApp() {
 
   // ── Public ──
   app.get("/api/status", (_req, res) =>
-    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), googleLogin: googleLoginEnabled(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta"), linkedin: providerConfigured("linkedin"), tiktok: providerConfigured("tiktok") } }),
+    res.json({ ai: LIVE ? "live" : "demo", billingEnabled: billingEnabled(), googleLogin: googleLoginEnabled(), marketingUrl: marketingUrl(), oauth: { google: providerConfigured("google"), meta: providerConfigured("meta"), linkedin: providerConfigured("linkedin"), tiktok: providerConfigured("tiktok") } }),
   );
   app.use("/api", authRouter);
 
@@ -456,6 +462,19 @@ export function createApp() {
   }));
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "Not found")));
+
+  // Crawlers may fetch pages (to see the noindex header) but are pointed at the marketing site.
+  app.get("/robots.txt", (_req, res) => {
+    const site = marketingUrl();
+    res.type("text/plain").send(`User-agent: *\nAllow: /\n${site ? `\n# The public site is ${site}\nSitemap: ${site}/wp-sitemap.xml\n` : ""}`);
+  });
+
+  // Legal pages live on the marketing site when there is one.
+  app.get(/^\/legal\/([a-z-]+)\/?$/, (req, res, next) => {
+    const site = marketingUrl();
+    if (!site) return next();
+    res.redirect(302, `${site}/legal/${req.params[0]}/`);
+  });
 
   // Production: serve the built client
   const dist = path.resolve("dist");

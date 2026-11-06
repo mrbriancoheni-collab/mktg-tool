@@ -11,6 +11,9 @@
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit",
+    "wp:check": "bash wordpress/tools/check/run.sh",
+    "wp:content": "node wordpress/tools/build-starter-content.mjs",
+    "wp:zip": "cd wordpress && rm -f adcanvas-theme.zip && zip -qr adcanvas-theme.zip adcanvas-theme -x '*.DS_Store' && echo 'Wrote wordpress/adcanvas-theme.zip'",
     "check:catalog": "tsx scripts/check-catalog.ts",
     "icons": "tsx scripts/gen-brand-icons.ts",
     "smoke": "tsx scripts/smoke.ts",
@@ -47,6 +50,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.2.1",
+    "@wordpress/block-serialization-default-parser": "^5.57.0",
     "concurrently": "^10.0.6",
     "typescript": "^5.9.0",
     "vite": "^8.3.5"
